@@ -1,0 +1,51 @@
+{
+    "github.copilot.nextEditSuggestions.enabled": false,
+    "workbench.startupEditor": "none",
+    "github.copilot.enable": {
+        "*": false,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false
+    },
+    "workbench.colorTheme": "Popping and Locking Black Theme",
+    "workbench.activityBar.location": "top",
+    "editor.fontFamily": "JetBrainsMono Nerd Font",
+    "editor.renderWhitespace": "none",
+    "editor.minimap.enabled": false,
+    "editor.renderControlCharacters": false,
+    "editor.cursorBlinking": "solid",
+    "editor.unicodeHighlight.nonBasicASCII": false,
+    "workbench.tree.indent": 8,
+    "editor.fontLigatures": false,
+    "[cpp]": {
+    "editor.defaultFormatter": "xaver.clang-format",
+    "editor.formatOnSave": true
+    },
+    "clangd.arguments": [
+        "--background-index",
+        "--clang-tidy",
+        "--completion-style=detailed",
+        "--header-insertion=never"
+    ],
+    "workbench.iconTheme": "catppuccin-mocha",
+    "workbench.productIconTheme": "icons-carbon",
+    "telemetry.telemetryLevel": "off",
+"telemetry.enableCrashReporter": false,
+"telemetry.enableTelemetry": false,
+"update.mode": "none",
+"extensions.autoCheckUpdates": false,
+"extensions.autoUpdate": false,
+"workbench.enableExperiments": false,
+"window.commandCenter": false,
+"workbench.layoutControl.enabled": false,
+"chat.viewWelcome.enabled": false,
+"chat.commandCenter.enabled": false,
+"window.menuBarVisibility": "compact",
+"window.restoreWindows": "none",
+
+
+
+
+
+
+}
