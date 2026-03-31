@@ -12,4 +12,4 @@ rsgain
 ryzen_smu-dkms-git
 visual-studio-code-bin
 wifitui-bin
-yay
+xcursor-simp1e

@@ -58,6 +58,7 @@ main() {
 
     run_module "github-auth.sh" || exit 1
     run_module "install-packes.sh" || exit 1
+    run_module "theme-assets-installer.sh" || exit 1
 
     echo ""
     echo "All install modules completed successfully."
