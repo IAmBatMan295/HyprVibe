@@ -4,44 +4,68 @@ set -uE -o pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 HYPRVIBE_REPO_URL="${HYPRVIBE_REPO_URL:-https://github.com/IAmBatMan295/HyprVibe.git}"
-HYPRVIBE_TARGET_DIR="${HYPRVIBE_TARGET_DIR:-${HOME}/HyprVibe}"
+USER_HOME="${HOME}"
+HYPRVIBE_TARGET_DIR="${USER_HOME}/HyprVibe"
 MODULES_DIR="$SCRIPT_DIR"
 SUDO_KEEPALIVE_PID=""
+CLONE_TMP_DIR=""
 
-refresh_hyprvibe_clone() {
-    if [[ -z "${HYPRVIBE_TARGET_DIR}" || "${HYPRVIBE_TARGET_DIR}" == "/" ]]; then
-        echo "Error: Unsafe HYPRVIBE_TARGET_DIR value: ${HYPRVIBE_TARGET_DIR}"
+cleanup_clone_temp() {
+    if [[ -n "$CLONE_TMP_DIR" && -d "$CLONE_TMP_DIR" ]]; then
+        rm -rf "$CLONE_TMP_DIR"
+    fi
+}
+
+validate_target_dir() {
+    local resolved_home
+    local resolved_target
+
+    resolved_home="$(realpath -m "$USER_HOME")"
+    resolved_target="$(realpath -m "$HYPRVIBE_TARGET_DIR")"
+
+    if [[ -z "$resolved_home" || "$resolved_home" == "/" ]]; then
+        echo "Error: Could not determine a safe user home directory."
         exit 1
     fi
+
+    if [[ "$resolved_target" != "${resolved_home}/HyprVibe" ]]; then
+        echo "Error: Installer target is fixed to ${resolved_home}/HyprVibe"
+        exit 1
+    fi
+}
+
+refresh_hyprvibe_clone() {
+    validate_target_dir
 
     if ! command -v git >/dev/null 2>&1; then
         echo "Error: git is required for bootstrap clone."
         exit 1
     fi
 
-    local tmp_dir
-    tmp_dir="$(mktemp -d)" || {
+    CLONE_TMP_DIR="$(mktemp -d)" || {
         echo "Error: Failed to create temporary directory for clone."
         exit 1
     }
 
-    local cloned_repo_dir="${tmp_dir}/HyprVibe"
+    trap 'cleanup_clone_temp; exit 1' INT TERM
+
+    local cloned_repo_dir="${CLONE_TMP_DIR}/HyprVibe"
 
     echo "==> Cloning fresh HyprVibe copy from ${HYPRVIBE_REPO_URL}"
-    if ! git clone "$HYPRVIBE_REPO_URL" "$cloned_repo_dir"; then
-        rm -rf "$tmp_dir"
+    if ! git clone --depth 1 "$HYPRVIBE_REPO_URL" "$cloned_repo_dir"; then
+        cleanup_clone_temp
         echo "Error: Failed to clone ${HYPRVIBE_REPO_URL}"
         exit 1
     fi
 
     if [[ ! -f "${cloned_repo_dir}/bin/install.sh" ]]; then
-        rm -rf "$tmp_dir"
+        cleanup_clone_temp
         echo "Error: Cloned repository does not contain bin/install.sh"
         exit 1
     fi
 
     mkdir -p "$(dirname -- "$HYPRVIBE_TARGET_DIR")"
-    cd "$HOME"
+    cd "$USER_HOME"
 
     if [[ -e "$HYPRVIBE_TARGET_DIR" ]]; then
         echo "==> Replacing existing directory: ${HYPRVIBE_TARGET_DIR}"
@@ -49,7 +73,8 @@ refresh_hyprvibe_clone() {
     fi
 
     mv "$cloned_repo_dir" "$HYPRVIBE_TARGET_DIR"
-    rm -rf "$tmp_dir"
+    cleanup_clone_temp
+    trap - INT TERM
 
     MODULES_DIR="${HYPRVIBE_TARGET_DIR}/bin"
 

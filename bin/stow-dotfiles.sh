@@ -45,11 +45,41 @@ require_directory() {
     fi
 }
 
+is_safe_target_path() {
+    local target_path="$1"
+    local resolved_home
+    local resolved_target
+
+    resolved_home="$(realpath -m "$HOME")"
+    resolved_target="$(realpath -m "$target_path")"
+
+    if [[ "$resolved_target" == "$resolved_home" || "$resolved_target" == "/" ]]; then
+        return 1
+    fi
+
+    case "$resolved_target" in
+        "$resolved_home/.config/"*|"$resolved_home"/.*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 remove_target_if_exists() {
     local target_path="$1"
+
+    if ! is_safe_target_path "$target_path"; then
+        echo "Error: Unsafe target path for cleanup: $target_path"
+        return 1
+    fi
+
     if [[ -L "$target_path" || -e "$target_path" ]]; then
         rm -rf "$target_path"
     fi
+
+    return 0
 }
 
 preclean_package_targets() {
@@ -59,14 +89,14 @@ preclean_package_targets() {
     if [[ "$pkg" == "Code" ]]; then
         # VS Code: replace only settings.json, keep extensions/state/cache intact.
         mkdir -p "${HOME}/.config/Code/User"
-        remove_target_if_exists "${HOME}/.config/Code/User/settings.json"
+        remove_target_if_exists "${HOME}/.config/Code/User/settings.json" || return 1
         return 0
     fi
 
     if [[ -d "${pkg_dir}/.config" ]]; then
         local cfg_entry
         while IFS= read -r -d '' cfg_entry; do
-            remove_target_if_exists "${HOME}/.config/$(basename "$cfg_entry")"
+            remove_target_if_exists "${HOME}/.config/$(basename "$cfg_entry")" || return 1
         done < <(find "${pkg_dir}/.config" -mindepth 1 -maxdepth 1 -print0)
     fi
 
@@ -75,8 +105,10 @@ preclean_package_targets() {
         if [[ "$(basename "$top_entry")" == ".config" ]]; then
             continue
         fi
-        remove_target_if_exists "${HOME}/$(basename "$top_entry")"
+        remove_target_if_exists "${HOME}/$(basename "$top_entry")" || return 1
     done < <(find "$pkg_dir" -mindepth 1 -maxdepth 1 -name ".*" -print0)
+
+    return 0
 }
 
 main() {
@@ -90,7 +122,7 @@ main() {
 
     echo "==> Preparing target paths for repo-first stow behavior"
     for pkg in "${PACKAGES[@]}"; do
-        preclean_package_targets "$pkg"
+        preclean_package_targets "$pkg" || return 1
     done
 
     echo "==> Stowing dotfiles packages into ${HOME}"
