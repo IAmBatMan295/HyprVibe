@@ -1,1 +1,11 @@
 tmux/.config/tmux/plugins/
+
+# Track only VS Code settings, ignore all other VS Code state/cache files.
+Code/*
+!Code/.config/
+Code/.config/*
+!Code/.config/Code/
+Code/.config/Code/*
+!Code/.config/Code/User/
+Code/.config/Code/User/*
+!Code/.config/Code/User/settings.json

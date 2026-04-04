@@ -41,11 +41,6 @@
 "chat.viewWelcome.enabled": false,
 "chat.commandCenter.enabled": false,
 "window.menuBarVisibility": "compact",
-"window.restoreWindows": "none",
-
-
-
-
-
+"window.restoreWindows": "none"
 
 }

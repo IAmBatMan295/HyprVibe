@@ -65,7 +65,7 @@ cpg() {
 rustpg() {
   cd "$HOME/Desktop/rustpg" || return
 }
-pythonpg() {
+pypg() {
   cd "$HOME/Desktop/pythonpg" || return
 }
 
