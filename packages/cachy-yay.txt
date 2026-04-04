@@ -1,0 +1,16 @@
+clutter
+clutter-gtk
+cogl
+ferrite-bin
+hyprshade
+localsend-bin
+modprobed-db
+mpdris2
+oh-my-posh-bin
+preload
+puddletag
+rsgain
+ryzen_smu-dkms-git
+visual-studio-code-bin
+wifitui-bin
+xcursor-simp1e

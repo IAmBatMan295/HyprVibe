@@ -5,9 +5,60 @@ set -uE -o pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 PACKAGES_DIR="${ROOT_DIR}/packages"
-PACMAN_LIST="${PACKAGES_DIR}/pacman.txt"
-YAY_LIST="${PACKAGES_DIR}/yay.txt"
+PACMAN_LIST=""
+YAY_LIST=""
+PACKAGE_PROFILE=""
 MIN_ATTEMPTS=3
+
+detect_package_profile() {
+    local requested_profile="${HYPRVIBE_PACKAGE_PROFILE:-}"
+
+    if [[ -n "$requested_profile" ]]; then
+        case "${requested_profile,,}" in
+            cachy|arch)
+                PACKAGE_PROFILE="${requested_profile,,}"
+                return 0
+                ;;
+            *)
+                echo "Error: HYPRVIBE_PACKAGE_PROFILE must be either 'cachy' or 'arch'."
+                return 1
+                ;;
+        esac
+    fi
+
+    local os_id=""
+    if [[ -r /etc/os-release ]]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        os_id="${ID:-}"
+    fi
+
+    case "${os_id,,}" in
+        cachyos)
+            PACKAGE_PROFILE="cachy"
+            ;;
+        *)
+            PACKAGE_PROFILE="arch"
+            ;;
+    esac
+}
+
+set_package_files() {
+    case "$PACKAGE_PROFILE" in
+        cachy)
+            PACMAN_LIST="${PACKAGES_DIR}/cachy-pacman.txt"
+            YAY_LIST="${PACKAGES_DIR}/cachy-yay.txt"
+            ;;
+        arch)
+            PACMAN_LIST="${PACKAGES_DIR}/arch-pacman.txt"
+            YAY_LIST="${PACKAGES_DIR}/arch-yay.txt"
+            ;;
+        *)
+            echo "Error: Unsupported package profile: $PACKAGE_PROFILE"
+            return 1
+            ;;
+    esac
+}
 
 trim() {
     local value="$1"
@@ -210,6 +261,10 @@ main() {
         echo "Please run this script as a normal user with sudo privileges, not as root."
         exit 1
     fi
+
+    detect_package_profile || exit 1
+    set_package_files || exit 1
+    echo "Using package profile: ${PACKAGE_PROFILE}"
 
     require_file "$PACMAN_LIST"
     require_file "$YAY_LIST"
