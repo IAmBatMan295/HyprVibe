@@ -120,4 +120,4 @@ cmclean() {
 alias hconfig='nvim ~/.config/hypr/hyprland.conf'
 alias wconfig='nvim ~/.config/waybar/config.jsonc'
 
-alias mrsgain='rsgain easy -m MAX -p no_album -S "/home/kunjan/Music/music"'
+alias mrsgain='rsgain easy -m MAX -p no_album -S "$HOME/Music/music"'
