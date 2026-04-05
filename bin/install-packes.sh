@@ -221,19 +221,41 @@ bootstrap_yay_verify() {
 }
 
 setup_reflector_once() {
+    if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
+        if ! command -v cachyos-rate-mirrors >/dev/null 2>&1; then
+            echo "==> cachyos-rate-mirrors not found. Installing it first"
+            sudo pacman -S --needed --noconfirm cachyos-rate-mirrors || return 1
+        fi
+
+        echo "==> Running cachyos-rate-mirrors for CachyOS mirrorlists"
+        sudo cachyos-rate-mirrors
+        echo "==> cachyos-rate-mirrors completed"
+        return 0
+    fi
+
     if ! command -v reflector >/dev/null 2>&1; then
         echo "==> reflector not found. Installing reflector first"
         sudo pacman -S --needed --noconfirm reflector || return 1
     fi
 
-    sudo reflector \
-        --age 12 \
-        --latest 20 \
-        --country India,Taiwan,Singapore,Japan \
-        --save /etc/pacman.d/mirrorlist
+    run_reflector_for_target "/etc/pacman.d/mirrorlist" || return 1
+}
+
+run_reflector_for_target() {
+    local target_file="$1"
+
+    echo "==> Running reflector to refresh ${target_file}"
+    echo "==> Command: sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save ${target_file}"
+    sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save "$target_file"
+    echo "==> reflector completed"
 }
 
 verify_reflector_setup() {
+    if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
+        command -v cachyos-rate-mirrors >/dev/null 2>&1
+        return
+    fi
+
     command -v reflector >/dev/null 2>&1
 }
 

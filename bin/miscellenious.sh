@@ -13,6 +13,34 @@ cleanup() {
 }
 trap cleanup EXIT
 
+enable_services() {
+    local -a global_services=(
+        "NetworkManager.service"
+        "sddm.service"
+        "preload.service"
+        "bluetooth.service"
+    )
+
+    local -a user_services=(
+        "mpd.service"
+        "mpDris2.service"
+        "wireplumber.service"
+    )
+
+    echo "==> Enabling global services with --now"
+    local service
+    for service in "${global_services[@]}"; do
+        sudo systemctl enable --now "$service"
+    done
+
+    echo "==> Enabling user services with --now"
+    for service in "${user_services[@]}"; do
+        systemctl --user enable --now "$service"
+    done
+
+    echo "==> Service enablement completed"
+}
+
 install_uosc_stack() {
     echo "==> Installing latest uosc"
     curl -fsSL "https://github.com/tomasklaen/uosc/releases/latest/download/uosc.zip" -o "$TMP_DIR/uosc.zip"
@@ -33,6 +61,7 @@ install_uosc_stack() {
 
 main() {
     install_uosc_stack
+    enable_services
 }
 
 main "$@"
