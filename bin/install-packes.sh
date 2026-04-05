@@ -10,6 +10,25 @@ YAY_LIST=""
 PACKAGE_PROFILE=""
 MIN_ATTEMPTS=3
 
+read_from_tty() {
+    local prompt="$1"
+    local out_var="$2"
+    local input=""
+
+    if [[ -r /dev/tty ]]; then
+        if ! read -r -p "$prompt" input </dev/tty; then
+            return 1
+        fi
+    else
+        if ! read -r -p "$prompt" input; then
+            return 1
+        fi
+    fi
+
+    printf -v "$out_var" '%s' "$input"
+    return 0
+}
+
 detect_package_profile() {
     local requested_profile="${HYPRVIBE_PACKAGE_PROFILE:-}"
 
@@ -112,9 +131,14 @@ prompt_retry() {
     local attempt="$1"
     local step_name="$2"
     local next_attempt=$((attempt + 1))
+    local answer
 
     while true; do
-        read -r -p "$step_name failed on attempt ${attempt}. Retry with attempt ${next_attempt}? [y/N]: " answer
+        if ! read_from_tty "$step_name failed on attempt ${attempt}. Retry with attempt ${next_attempt}? [y/N]: " answer; then
+            echo "Error: Interactive input unavailable. Cannot continue retry loop for ${step_name}."
+            return 1
+        fi
+
         case "${answer,,}" in
             y|yes)
                 return 0

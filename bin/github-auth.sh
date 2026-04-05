@@ -12,17 +12,44 @@ ensure_ssh_dir() {
 	chmod 700 "$SSH_DIR"
 }
 
-generate_key_if_missing() {
+require_command() {
+	local cmd="$1"
+	if ! command -v "$cmd" >/dev/null 2>&1; then
+		echo "Error: Required command not found: $cmd"
+		return 1
+	fi
+}
+
+read_from_tty() {
+	local prompt="$1"
+	local out_var="$2"
+	local input=""
+
+	if [[ -r /dev/tty ]]; then
+		if ! read -r -p "$prompt" input </dev/tty; then
+			return 1
+		fi
+	else
+		if ! read -r -p "$prompt" input; then
+			return 1
+		fi
+	fi
+
+	printf -v "$out_var" '%s' "$input"
+	return 0
+}
+
+regenerate_key() {
 	local key_path="$1"
 	local comment="$2"
 
-	if [[ -f "$key_path" ]]; then
-		echo "==> Key exists, keeping it: $key_path"
-		return 0
+	if [[ -f "$key_path" || -f "${key_path}.pub" ]]; then
+		echo "==> Replacing existing SSH key: $key_path"
+		rm -f "$key_path" "${key_path}.pub"
 	fi
 
 	echo "==> Generating SSH key: $key_path"
-	ssh-keygen -t ed25519 -C "$comment" -f "$key_path" -N ""
+	ssh-keygen -q -t ed25519 -C "$comment" -f "$key_path" -N ""
 }
 
 write_ssh_config() {
@@ -44,26 +71,39 @@ EOF
 }
 
 show_public_keys() {
+	if [[ ! -f "${GITHUB_KEY}.pub" || ! -f "${GITLAB_KEY}.pub" ]]; then
+		echo "Error: Could not find one or both generated public keys."
+		return 1
+	fi
+
 	echo ""
 	echo "==> GitHub public key (add this to GitHub SSH keys):"
+	echo "----- BEGIN GITHUB PUBLIC KEY -----"
 	cat "${GITHUB_KEY}.pub"
+	echo "----- END GITHUB PUBLIC KEY -----"
 
 	echo ""
 	echo "==> GitLab public key (add this to GitLab SSH keys):"
+	echo "----- BEGIN GITLAB PUBLIC KEY -----"
 	cat "${GITLAB_KEY}.pub"
+	echo "----- END GITLAB PUBLIC KEY -----"
 	echo ""
 }
 
 confirm_keys_added() {
 	local answer
 	while true; do
-		read -r -p "Have you added BOTH keys to GitHub and GitLab? [y/N]: " answer
+		if ! read_from_tty "Have you added BOTH keys to GitHub and GitLab? [y/N]: " answer; then
+			echo "Error: Interactive input is required to confirm SSH key upload."
+			return 1
+		fi
+
 		case "${answer,,}" in
 			y|yes)
 				return 0
 				;;
 			n|no|"")
-				echo "Please add both keys first. This script will wait here until you confirm with 'y'."
+				echo "Please add both keys first, then confirm with 'y'."
 				;;
 			*)
 				echo "Please answer yes or no."
@@ -73,12 +113,15 @@ confirm_keys_added() {
 }
 
 main() {
+	require_command ssh-keygen || exit 1
+	require_command cat || exit 1
+
 	ensure_ssh_dir
-	generate_key_if_missing "$GITHUB_KEY" "github"
-	generate_key_if_missing "$GITLAB_KEY" "gitlab"
+	regenerate_key "$GITHUB_KEY" "github"
+	regenerate_key "$GITLAB_KEY" "gitlab"
 	write_ssh_config
-	show_public_keys
-	confirm_keys_added
+	show_public_keys || exit 1
+	confirm_keys_added || exit 1
 
 	echo "==> GitHub/GitLab SSH setup complete."
 }

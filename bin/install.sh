@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -uE -o pipefail
+set -eEuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 HYPRVIBE_REPO_URL="${HYPRVIBE_REPO_URL:-https://github.com/IAmBatMan295/HyprVibe.git}"
@@ -9,6 +9,24 @@ HYPRVIBE_TARGET_DIR="${USER_HOME}/HyprVibe"
 MODULES_DIR="$SCRIPT_DIR"
 SUDO_KEEPALIVE_PID=""
 CLONE_TMP_DIR=""
+
+on_error() {
+    local line_no="$1"
+    local exit_code="$2"
+    echo "Error: install.sh failed at line ${line_no} with exit code ${exit_code}."
+}
+
+trap 'on_error "$LINENO" "$?"' ERR
+
+require_interactive_tty() {
+    if [[ -r /dev/tty ]]; then
+        return 0
+    fi
+
+    echo "Error: Interactive terminal input is required for this installer."
+    echo "Run the script from a normal terminal session."
+    return 1
+}
 
 cleanup_clone_temp() {
     if [[ -n "$CLONE_TMP_DIR" && -d "$CLONE_TMP_DIR" ]]; then
@@ -88,14 +106,23 @@ refresh_hyprvibe_clone() {
 
 start_sudo_keepalive() {
     echo "==> Requesting sudo once for this full install run"
-    sudo -v
+    if ! sudo -v; then
+        echo "Error: Failed to validate sudo credentials."
+        return 1
+    fi
 
     while true; do
+        sleep 50
+
+        if ! kill -0 "$$" 2>/dev/null; then
+            exit 0
+        fi
+
         if ! sudo -n true 2>/dev/null; then
+            echo "Error: Sudo session expired during install. Stopping installer."
+            kill -TERM "$$" >/dev/null 2>&1 || true
             exit 1
         fi
-        sleep 50
-        kill -0 "$$" 2>/dev/null || exit 0
     done &
 
     SUDO_KEEPALIVE_PID="$!"
@@ -136,8 +163,10 @@ main() {
         exit 1
     fi
 
+    require_interactive_tty || exit 1
+
     trap stop_sudo_keepalive EXIT
-    start_sudo_keepalive
+    start_sudo_keepalive || exit 1
 
     run_module "github-auth.sh" || exit 1
     run_module "install-packes.sh" || exit 1
