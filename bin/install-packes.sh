@@ -109,19 +109,22 @@ load_packages() {
     done < "$file_path"
 }
 
-is_installed() {
-    local pkg="$1"
-    pacman -Q "$pkg" >/dev/null 2>&1
-}
-
 missing_packages() {
     local -n all_pkgs="$1"
     local -n missing_out="$2"
     missing_out=()
 
+    local -A installed_map=()
+    local installed_pkg=""
+    while IFS= read -r installed_pkg; do
+        if [[ -n "$installed_pkg" ]]; then
+            installed_map["$installed_pkg"]=1
+        fi
+    done < <(pacman -Qq)
+
     local pkg
     for pkg in "${all_pkgs[@]}"; do
-        if ! is_installed "$pkg"; then
+        if [[ -z "${installed_map[$pkg]+x}" ]]; then
             missing_out+=("$pkg")
         fi
     done
@@ -189,7 +192,7 @@ bootstrap_yay_once() {
     fi
 
     echo "==> yay not found. Installing from AUR git repository"
-    sudo pacman -S --needed --noconfirm base-devel git || return 1
+    sudo pacman -S --needed base-devel git || return 1
 
     local tmp_dir
     tmp_dir="$(mktemp -d)" || return 1
@@ -204,7 +207,7 @@ bootstrap_yay_once() {
         return 1
     }
 
-    if ! makepkg -si --noconfirm; then
+    if ! makepkg -si; then
         popd >/dev/null
         rm -rf "$tmp_dir"
         return 1
@@ -224,7 +227,7 @@ setup_reflector_once() {
     if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
         if ! command -v cachyos-rate-mirrors >/dev/null 2>&1; then
             echo "==> cachyos-rate-mirrors not found. Installing it first"
-            sudo pacman -S --needed --noconfirm cachyos-rate-mirrors || return 1
+            sudo pacman -S --needed cachyos-rate-mirrors || return 1
         fi
 
         echo "==> Running cachyos-rate-mirrors for CachyOS mirrorlists"
@@ -235,7 +238,7 @@ setup_reflector_once() {
 
     if ! command -v reflector >/dev/null 2>&1; then
         echo "==> reflector not found. Installing reflector first"
-        sudo pacman -S --needed --noconfirm reflector || return 1
+        sudo pacman -S --needed reflector || return 1
     fi
 
     run_reflector_for_target "/etc/pacman.d/mirrorlist" || return 1
@@ -275,7 +278,8 @@ install_pacman_once() {
         return 0
     fi
 
-    sudo pacman -S --needed --noconfirm "${missing[@]}"
+    echo "==> Installing ${#missing[@]} missing pacman package(s)"
+    sudo pacman -S --needed "${missing[@]}"
 }
 
 verify_pacman_install() {
@@ -295,7 +299,7 @@ install_yay_packages_once() {
         return 0
     fi
 
-    yay -S --needed --noconfirm --sudoloop "${YAY_PKGS[@]}"
+    yay -S --needed --sudoloop "${YAY_PKGS[@]}"
 }
 
 verify_yay_install() {
