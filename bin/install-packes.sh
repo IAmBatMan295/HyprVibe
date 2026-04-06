@@ -267,7 +267,15 @@ install_pacman_once() {
         return 0
     fi
 
-    sudo pacman -Syu --needed --noconfirm "${PACMAN_PKGS[@]}"
+    local missing=()
+    missing_packages PACMAN_PKGS missing
+
+    if (( ${#missing[@]} == 0 )); then
+        echo "==> All pacman packages are already installed; skipping pacman install"
+        return 0
+    fi
+
+    sudo pacman -S --needed --noconfirm "${missing[@]}"
 }
 
 verify_pacman_install() {

@@ -2,6 +2,7 @@ clutter
 clutter-gtk
 cogl
 ferrite-bin
+grub-hook
 hyprshade
 localsend-bin
 modprobed-db

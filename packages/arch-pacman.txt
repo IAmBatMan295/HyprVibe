@@ -73,10 +73,7 @@ cifs-utils
 cinnamon-desktop
 clang
 cliphist
-clutter
-clutter-gtk
 cmake
-cogl
 compiler-rt
 composefs
 convertlit
@@ -188,7 +185,6 @@ grep
 grim
 groff
 grub
-grub-hook
 gsettings-desktop-schemas
 gsettings-system-schemas
 gsm
@@ -233,7 +229,6 @@ hyprland-guiutils
 hyprland-qt-support
 hyprlang
 hyprlock
-hyprshade
 hyprsunset
 hyprtoolkit
 hyprutils
@@ -284,7 +279,7 @@ kded
 kdenlive
 kdesu
 kdnssd
-kdsoap-qt6
+kdsoap
 kdsoap-ws-discovery-client
 keepassxc
 keyutils
@@ -636,7 +631,6 @@ llvm
 llvm-libs
 lmdb
 lm_sensors
-localsend-bin
 l-smash
 lsof
 lua
@@ -661,10 +655,8 @@ mkinitcpio
 mkinitcpio-busybox
 mlt
 mobile-broadband-provider-info
-modprobed-db
 mpd
 mpdecimal
-mpdris2
 mpfr
 mpg123
 mpv
@@ -697,7 +689,6 @@ numactl
 nwg-look
 ocean-sound-theme
 ocl-icd
-oh-my-posh-bin
 okular
 onetbb
 oniguruma
@@ -791,14 +782,12 @@ popt
 portaudio
 postgresql-libs
 pps-tools
-preload
 prison
 procps-ng
 protobuf
 protobuf-c
 prrte
 psmisc
-puddletag
 pugixml
 purpose
 pyenv
@@ -879,13 +868,11 @@ ripgrep
 ripgrep-all
 rmpc
 rofi
-rsgain
 rtkit
 rubberband
 rust
 rust-analyzer
 rust-src
-ryzen_smu-dkms-git
 sbc
 sdbus-cpp
 sddm
@@ -984,7 +971,6 @@ v4l-utils
 vapoursynth
 verdict
 vid.stab
-visual-studio-code-bin
 vlc-plugin-a52dec
 vlc-plugin-alsa
 vlc-plugin-archive
@@ -1028,7 +1014,6 @@ webrtc-audio-processing-1
 wf-recorder
 wget
 which
-wifitui-bin
 wildmidi
 wireless-regdb
 wireless_tools
@@ -1082,7 +1067,6 @@ xsel
 xvidcore
 xxhash
 xz
-yay
 zeromq
 zimg
 zint
