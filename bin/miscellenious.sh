@@ -62,11 +62,6 @@ enable_service_if_present() {
 }
 
 enable_services() {
-    if command -v systemd-detect-virt >/dev/null 2>&1 && systemd-detect-virt --quiet --chroot; then
-        echo "==> Running in chroot; skipping service enablement"
-        return 0
-    fi
-
     local -a global_services=(
         "NetworkManager.service"
         "sddm.service"
