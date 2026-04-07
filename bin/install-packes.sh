@@ -4,6 +4,16 @@ set -uE -o pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+COMMON_LIB="${SCRIPT_DIR}/lib/common.sh"
+
+if [[ ! -r "$COMMON_LIB" ]]; then
+    echo "Error: Missing common helper library: $COMMON_LIB" >&2
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$COMMON_LIB"
+
 PACKAGES_DIR="${ROOT_DIR}/packages"
 PACMAN_LIST=""
 YAY_LIST=""
@@ -21,25 +31,6 @@ YAY_INSTALL_FLAGS=(
     --answerupgrade None
     --noremovemake
 )
-
-read_from_tty() {
-    local prompt="$1"
-    local out_var="$2"
-    local input=""
-
-    if [[ -r /dev/tty ]]; then
-        if ! read -r -p "$prompt" input </dev/tty; then
-            return 1
-        fi
-    else
-        if ! read -r -p "$prompt" input; then
-            return 1
-        fi
-    fi
-
-    printf -v "$out_var" '%s' "$input"
-    return 0
-}
 
 run_with_tty_stdin() {
     if [[ -r /dev/tty ]]; then
@@ -59,7 +50,7 @@ detect_package_profile() {
                 return 0
                 ;;
             *)
-                echo "Error: HYPRVIBE_PACKAGE_PROFILE must be either 'cachy' or 'arch'."
+                log_error "HYPRVIBE_PACKAGE_PROFILE must be either 'cachy' or 'arch'."
                 return 1
                 ;;
         esac
@@ -93,7 +84,7 @@ set_package_files() {
             YAY_LIST="${PACKAGES_DIR}/arch-yay.txt"
             ;;
         *)
-            echo "Error: Unsupported package profile: $PACKAGE_PROFILE"
+            log_error "Unsupported package profile: $PACKAGE_PROFILE"
             return 1
             ;;
     esac
@@ -109,7 +100,7 @@ trim() {
 require_file() {
     local file_path="$1"
     if [[ ! -f "$file_path" ]]; then
-        echo "Error: Missing file: $file_path"
+        log_error "Missing file: $file_path"
         exit 1
     fi
 }
@@ -129,22 +120,42 @@ load_packages() {
     done < "$file_path"
 }
 
+declare -A INSTALLED_PKG_MAP=()
+INSTALLED_CACHE_VALID=0
+
+refresh_installed_pkg_cache() {
+    INSTALLED_PKG_MAP=()
+
+    local installed_pkg=""
+    while IFS= read -r installed_pkg; do
+        if [[ -n "$installed_pkg" ]]; then
+            INSTALLED_PKG_MAP["$installed_pkg"]=1
+        fi
+    done < <(pacman -Qq)
+
+    INSTALLED_CACHE_VALID=1
+}
+
+invalidate_installed_pkg_cache() {
+    INSTALLED_CACHE_VALID=0
+}
+
+ensure_installed_pkg_cache() {
+    if (( INSTALLED_CACHE_VALID == 0 )); then
+        refresh_installed_pkg_cache
+    fi
+}
+
 missing_packages() {
     local -n all_pkgs="$1"
     local -n missing_out="$2"
     missing_out=()
 
-    local -A installed_map=()
-    local installed_pkg=""
-    while IFS= read -r installed_pkg; do
-        if [[ -n "$installed_pkg" ]]; then
-            installed_map["$installed_pkg"]=1
-        fi
-    done < <(pacman -Qq)
+    ensure_installed_pkg_cache
 
     local pkg
     for pkg in "${all_pkgs[@]}"; do
-        if [[ -z "${installed_map[$pkg]+x}" ]]; then
+        if [[ -z "${INSTALLED_PKG_MAP[$pkg]+x}" ]]; then
             missing_out+=("$pkg")
         fi
     done
@@ -155,10 +166,12 @@ missing_packages_with_providers() {
     local -n missing_out="$2"
     missing_out=()
 
+    ensure_installed_pkg_cache
+
     local pkg
     local unresolved
     for pkg in "${all_pkgs[@]}"; do
-        if pacman -Q "$pkg" >/dev/null 2>&1; then
+        if [[ -n "${INSTALLED_PKG_MAP[$pkg]+x}" ]]; then
             continue
         fi
 
@@ -169,38 +182,12 @@ missing_packages_with_providers() {
     done
 }
 
-prompt_retry() {
-    local attempt="$1"
-    local step_name="$2"
-    local next_attempt=$((attempt + 1))
-    local answer
-
-    while true; do
-        if ! read_from_tty "$step_name failed on attempt ${attempt}. Retry with attempt ${next_attempt}? [y/N]: " answer; then
-            echo "Error: Interactive input unavailable. Cannot continue retry loop for ${step_name}."
-            return 1
-        fi
-
-        case "${answer,,}" in
-            y|yes)
-                return 0
-                ;;
-            n|no|"")
-                return 1
-                ;;
-            *)
-                echo "Please answer yes or no."
-                ;;
-        esac
-    done
-}
-
 should_run_mirror_ranking() {
     local answer
 
     while true; do
         if ! read_from_tty "Run mirror ranking now? [Y/n]: " answer; then
-            echo "Warning: Interactive input unavailable; proceeding with mirror ranking."
+            log_warn "Interactive input unavailable; proceeding with mirror ranking."
             return 0
         fi
 
@@ -212,7 +199,7 @@ should_run_mirror_ranking() {
                 return 1
                 ;;
             *)
-                echo "Please answer yes or no."
+                log_warn "Please answer yes or no."
                 ;;
         esac
     done
@@ -223,7 +210,7 @@ should_run_post_pacman_recheck() {
 
     while true; do
         if ! read_from_tty "Run post-pacman missing-package recheck pass? [Y/n]: " answer; then
-            echo "Warning: Interactive input unavailable; running post-pacman recheck."
+            log_warn "Interactive input unavailable; running post-pacman recheck."
             return 0
         fi
 
@@ -235,7 +222,7 @@ should_run_post_pacman_recheck() {
                 return 1
                 ;;
             *)
-                echo "Please answer yes or no."
+                log_warn "Please answer yes or no."
                 ;;
         esac
     done
@@ -247,7 +234,7 @@ should_run_slow_fallback() {
 
     while true; do
         if ! read_from_tty "Bulk ${manager_name} install failed. Run slower package-by-package fallback? [y/N]: " answer; then
-            echo "Warning: Interactive input unavailable; skipping package-by-package fallback."
+            log_warn "Interactive input unavailable; skipping package-by-package fallback."
             return 1
         fi
 
@@ -259,39 +246,9 @@ should_run_slow_fallback() {
                 return 1
                 ;;
             *)
-                echo "Please answer yes or no."
+                log_warn "Please answer yes or no."
                 ;;
         esac
-    done
-}
-
-run_with_retries() {
-    local step_name="$1"
-    local command_fn="$2"
-    local verify_fn="$3"
-    local attempt=1
-
-    while true; do
-        echo ""
-        echo "==> ${step_name}: attempt ${attempt}"
-
-        if "$command_fn" && "$verify_fn"; then
-            echo "==> ${step_name}: success"
-            return 0
-        fi
-
-        if (( attempt < MIN_ATTEMPTS )); then
-            echo "==> ${step_name}: failed (minimum target is ${MIN_ATTEMPTS} attempts)"
-        else
-            echo "==> ${step_name}: failed after ${attempt} attempt(s)"
-        fi
-
-        if ! prompt_retry "$attempt" "$step_name"; then
-            echo "Aborted by user during ${step_name}."
-            return 1
-        fi
-
-        ((attempt++))
     done
 }
 
@@ -300,7 +257,7 @@ bootstrap_yay_once() {
         return 0
     fi
 
-    echo "==> yay not found. Installing from AUR git repository"
+    log_info "yay not found. Installing from AUR git repository"
     run_with_tty_stdin sudo pacman -S --needed base-devel git || return 1
 
     local tmp_dir
@@ -335,18 +292,18 @@ bootstrap_yay_verify() {
 setup_reflector_once() {
     if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
         if ! command -v cachyos-rate-mirrors >/dev/null 2>&1; then
-            echo "==> cachyos-rate-mirrors not found. Installing it first"
+            log_info "cachyos-rate-mirrors not found. Installing it first"
             run_with_tty_stdin sudo pacman -S --needed cachyos-rate-mirrors || return 1
         fi
 
-        echo "==> Running cachyos-rate-mirrors for CachyOS mirrorlists"
+        log_info "Running cachyos-rate-mirrors for CachyOS mirrorlists"
         sudo cachyos-rate-mirrors
-        echo "==> cachyos-rate-mirrors completed"
+        log_success "cachyos-rate-mirrors completed"
         return 0
     fi
 
     if ! command -v reflector >/dev/null 2>&1; then
-        echo "==> reflector not found. Installing reflector first"
+        log_info "reflector not found. Installing reflector first"
         run_with_tty_stdin sudo pacman -S --needed reflector || return 1
     fi
 
@@ -356,10 +313,10 @@ setup_reflector_once() {
 run_reflector_for_target() {
     local target_file="$1"
 
-    echo "==> Running reflector to refresh ${target_file}"
-    echo "==> Command: sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save ${target_file}"
+    log_info "Running reflector to refresh ${target_file}"
+    log_info "Command: sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save ${target_file}"
     sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save "$target_file"
-    echo "==> reflector completed"
+    log_success "reflector completed"
 }
 
 verify_reflector_setup() {
@@ -379,9 +336,11 @@ sync_and_upgrade_system_once() {
         return 0
     fi
 
-    echo "==> Syncing package databases and upgrading system packages first"
-    echo "==> This prevents dependency breakage during large package installs"
+    log_phase "System Sync"
+    log_info "Syncing package databases and upgrading system packages first"
+    log_info "This prevents dependency breakage during large package installs"
     run_with_tty_stdin sudo pacman -Syu || return 1
+    invalidate_installed_pkg_cache
 
     PACMAN_SYSUPGRADE_DONE=1
     return 0
@@ -397,31 +356,37 @@ install_pacman_with_fallback() {
     fi
 
     if run_with_tty_stdin sudo pacman -S --needed --ask=4 "${targets[@]}"; then
+        invalidate_installed_pkg_cache
         return 0
     fi
 
+    invalidate_installed_pkg_cache
+
     if ! should_run_slow_fallback "pacman"; then
-        echo "==> Skipping package-by-package pacman fallback"
+        log_warn "Skipping package-by-package pacman fallback"
         return 1
     fi
 
-    echo "==> Bulk pacman transaction failed; retrying package-by-package"
+    log_warn "Bulk pacman transaction failed; retrying package-by-package"
 
     for pkg in "${targets[@]}"; do
         if pacman -Q "$pkg" >/dev/null 2>&1; then
             continue
         fi
 
-        echo "==> Installing pacman package: ${pkg}"
+        log_info "Installing pacman package: ${pkg}"
         if ! run_with_tty_stdin sudo pacman -S --needed --ask=4 "$pkg"; then
             failed+=("$pkg")
         fi
     done
 
     if (( ${#failed[@]} > 0 )); then
-        echo "Pacman packages still failing: ${failed[*]}"
+        invalidate_installed_pkg_cache
+        log_error "Pacman packages still failing: ${failed[*]}"
         return 1
     fi
+
+    invalidate_installed_pkg_cache
 
     return 0
 }
@@ -437,15 +402,18 @@ install_yay_with_fallback() {
     fi
 
     if run_with_tty_stdin yay -S "${YAY_INSTALL_FLAGS[@]}" "${targets[@]}"; then
+        invalidate_installed_pkg_cache
         return 0
     fi
 
+    invalidate_installed_pkg_cache
+
     if ! should_run_slow_fallback "yay"; then
-        echo "==> Skipping package-by-package yay fallback"
+        log_warn "Skipping package-by-package yay fallback"
         return 1
     fi
 
-    echo "==> Bulk yay transaction failed; retrying package-by-package"
+    log_warn "Bulk yay transaction failed; retrying package-by-package"
 
     for pkg in "${targets[@]}"; do
         unresolved="$(pacman -T "$pkg" 2>/dev/null || true)"
@@ -453,16 +421,19 @@ install_yay_with_fallback() {
             continue
         fi
 
-        echo "==> Installing yay package: ${pkg}"
+        log_info "Installing yay package: ${pkg}"
         if ! run_with_tty_stdin yay -S "${YAY_INSTALL_FLAGS[@]}" "$pkg"; then
             failed+=("$pkg")
         fi
     done
 
     if (( ${#failed[@]} > 0 )); then
-        echo "Yay packages still failing: ${failed[*]}"
+        invalidate_installed_pkg_cache
+        log_error "Yay packages still failing: ${failed[*]}"
         return 1
     fi
+
+    invalidate_installed_pkg_cache
 
     return 0
 }
@@ -476,13 +447,13 @@ install_pacman_once() {
     missing_packages PACMAN_PKGS missing
 
     if (( ${#missing[@]} == 0 )); then
-        echo "==> All pacman packages are already installed; skipping pacman install"
+        log_success "All pacman packages are already installed; skipping pacman install"
         return 0
     fi
 
     sync_and_upgrade_system_once || return 1
 
-    echo "==> Installing ${#missing[@]} missing pacman package(s)"
+    log_info "Installing ${#missing[@]} missing pacman package(s)"
     install_pacman_with_fallback "${missing[@]}"
 }
 
@@ -491,7 +462,7 @@ verify_pacman_install() {
     missing_packages PACMAN_PKGS missing
 
     if (( ${#missing[@]} > 0 )); then
-        echo "Missing pacman packages: ${missing[*]}"
+        log_error "Missing pacman packages: ${missing[*]}"
         return 1
     fi
 
@@ -507,11 +478,11 @@ install_yay_packages_once() {
     missing_packages_with_providers YAY_PKGS missing
 
     if (( ${#missing[@]} == 0 )); then
-        echo "==> All yay packages are already installed; skipping yay install"
+        log_success "All yay packages are already installed; skipping yay install"
         return 0
     fi
 
-    echo "==> Installing ${#missing[@]} missing yay package(s)"
+    log_info "Installing ${#missing[@]} missing yay package(s)"
     install_yay_with_fallback "${missing[@]}"
 }
 
@@ -520,7 +491,7 @@ verify_yay_install() {
     missing_packages_with_providers YAY_PKGS missing
 
     if (( ${#missing[@]} > 0 )); then
-        echo "Missing yay packages: ${missing[*]}"
+        log_error "Missing yay packages: ${missing[*]}"
         return 1
     fi
 
@@ -528,14 +499,17 @@ verify_yay_install() {
 }
 
 main() {
+    setup_colors
+
     if [[ "${EUID}" -eq 0 ]]; then
-        echo "Please run this script as a normal user with sudo privileges, not as root."
+        log_error "Please run this script as a normal user with sudo privileges, not as root."
         exit 1
     fi
 
     detect_package_profile || exit 1
     set_package_files || exit 1
-    echo "Using package profile: ${PACKAGE_PROFILE}"
+    log_phase "Package Profile"
+    log_info "Using package profile: ${PACKAGE_PROFILE}"
 
     require_file "$PACMAN_LIST"
     require_file "$YAY_LIST"
@@ -545,7 +519,7 @@ main() {
     if should_run_mirror_ranking; then
         run_with_retries "Setup reflector mirrors" setup_reflector_once verify_reflector_setup || exit 1
     else
-        echo "==> Skipping mirror ranking by user choice"
+        log_warn "Skipping mirror ranking by user choice"
     fi
 
     run_with_retries "Install pacman packages" install_pacman_once verify_pacman_install || exit 1
@@ -553,14 +527,14 @@ main() {
     if should_run_post_pacman_recheck; then
         run_with_retries "Post-pacman missing package pass" install_pacman_once verify_pacman_install || exit 1
     else
-        echo "==> Skipping post-pacman missing-package recheck by user choice"
+        log_warn "Skipping post-pacman missing-package recheck by user choice"
     fi
 
     run_with_retries "Install yay helper" bootstrap_yay_once bootstrap_yay_verify || exit 1
     run_with_retries "Install yay packages" install_yay_packages_once verify_yay_install || exit 1
 
-    echo ""
-    echo "All package installation steps completed successfully."
+    log_phase "Package Installer Summary"
+    log_success "All package installation steps completed successfully."
 }
 
 main "$@"

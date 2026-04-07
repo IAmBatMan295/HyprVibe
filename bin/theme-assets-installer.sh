@@ -3,88 +3,21 @@
 set -uE -o pipefail
 
 MIN_ATTEMPTS=3
-USER_HOME="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)"
-if [[ -z "$USER_HOME" ]]; then
-    USER_HOME="${HOME}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_LIB="${SCRIPT_DIR}/lib/common.sh"
+
+if [[ ! -r "$COMMON_LIB" ]]; then
+    echo "Error: Missing common helper library: $COMMON_LIB" >&2
+    exit 1
 fi
+
+# shellcheck disable=SC1090
+source "$COMMON_LIB"
+
+USER_HOME="$(resolve_user_home)"
 ICONS_DIR="${USER_HOME}/.local/share/icons"
 YAMIS_DIR_USER="${ICONS_DIR}/YAMIS"
 YAMIS_DIR_SYSTEM="/usr/share/icons/YAMIS"
-
-read_from_tty() {
-    local prompt="$1"
-    local out_var="$2"
-    local input=""
-
-    if [[ -r /dev/tty ]]; then
-        if ! read -r -p "$prompt" input </dev/tty; then
-            return 1
-        fi
-    else
-        if ! read -r -p "$prompt" input; then
-            return 1
-        fi
-    fi
-
-    printf -v "$out_var" '%s' "$input"
-    return 0
-}
-
-prompt_retry() {
-    local attempt="$1"
-    local step_name="$2"
-    local next_attempt=$((attempt + 1))
-    local answer
-
-    while true; do
-        if ! read_from_tty "$step_name failed on attempt ${attempt}. Retry with attempt ${next_attempt}? [y/N]: " answer; then
-            echo "Error: Interactive input unavailable. Cannot continue retry loop for ${step_name}."
-            return 1
-        fi
-
-        case "${answer,,}" in
-            y|yes)
-                return 0
-                ;;
-            n|no|"")
-                return 1
-                ;;
-            *)
-                echo "Please answer yes or no."
-                ;;
-        esac
-    done
-}
-
-run_with_retries() {
-    local step_name="$1"
-    local command_fn="$2"
-    local verify_fn="$3"
-    local attempt=1
-
-    while true; do
-        echo ""
-        echo "==> ${step_name}: attempt ${attempt}"
-
-        if "$command_fn" && "$verify_fn"; then
-            echo "==> ${step_name}: success"
-            return 0
-        fi
-
-        if (( attempt < MIN_ATTEMPTS )); then
-            echo "==> ${step_name}: failed (minimum target is ${MIN_ATTEMPTS} attempts)"
-        else
-            echo "==> ${step_name}: failed after ${attempt} attempt(s)"
-        fi
-
-        if ! prompt_retry "$attempt" "$step_name"; then
-            echo "Aborted by user during ${step_name}."
-            return 1
-        fi
-
-        ((attempt++))
-    done
-}
 
 yamis_installed() {
     [[ -f "${YAMIS_DIR_USER}/index.theme" || -f "${YAMIS_DIR_SYSTEM}/index.theme" ]]
@@ -145,9 +78,9 @@ install_yamis_once() {
         local existing_path
         existing_path="$(current_yamis_location || true)"
         if [[ -n "$existing_path" ]]; then
-            echo "==> YAMIS already installed at ${existing_path}. Skipping clone/install."
+            log_success "YAMIS already installed at ${existing_path}. Skipping clone/install."
         else
-            echo "==> YAMIS already installed. Skipping clone/install."
+            log_success "YAMIS already installed. Skipping clone/install."
         fi
         return 0
     fi
@@ -168,7 +101,7 @@ install_yamis_once() {
     local url
     local cloned_dir=""
     for url in "${repo_urls[@]}"; do
-        echo "==> Trying YAMIS source: ${url}"
+        log_info "Trying YAMIS source: ${url}"
         if git clone --depth 1 "$url" "${tmp_dir}/src" >/dev/null 2>&1; then
             cloned_dir="${tmp_dir}/src"
             break
@@ -176,7 +109,7 @@ install_yamis_once() {
     done
 
     if [[ -z "$cloned_dir" ]]; then
-        echo "Error: Unable to clone YAMIS from configured sources."
+        log_error "Unable to clone YAMIS from configured sources."
         rm -rf "$tmp_dir"
         return 1
     fi
@@ -185,13 +118,13 @@ install_yamis_once() {
     if ! theme_dir="$(detect_theme_dir "$cloned_dir")"; then
         local extracted_dir="${tmp_dir}/extracted"
         if ! theme_dir="$(try_extract_archive_theme_dir "$cloned_dir" "$extracted_dir")"; then
-            echo "Error: Could not find YAMIS theme files in cloned repository."
+            log_error "Could not find YAMIS theme files in cloned repository."
             rm -rf "$tmp_dir"
             return 1
         fi
     fi
 
-    echo "==> Using YAMIS theme files from: ${theme_dir}"
+    log_info "Using YAMIS theme files from: ${theme_dir}"
 
     mkdir -p "$ICONS_DIR" || {
         rm -rf "$tmp_dir"
@@ -210,12 +143,12 @@ install_yamis_once() {
     }
 
     if [[ ! -f "${YAMIS_DIR_USER}/index.theme" ]]; then
-        echo "Error: YAMIS install verification failed: missing ${YAMIS_DIR_USER}/index.theme"
+        log_error "YAMIS install verification failed: missing ${YAMIS_DIR_USER}/index.theme"
         rm -rf "$tmp_dir"
         return 1
     fi
 
-    echo "==> YAMIS installed to ${YAMIS_DIR_USER}"
+    log_success "YAMIS installed to ${YAMIS_DIR_USER}"
 
     if command -v gtk-update-icon-cache >/dev/null 2>&1; then
         gtk-update-icon-cache -f -t "$YAMIS_DIR_USER" >/dev/null 2>&1 || true
@@ -230,9 +163,11 @@ verify_yamis_install() {
 }
 
 main() {
+    setup_colors
+
     run_with_retries "Install YAMIS icon theme" install_yamis_once verify_yamis_install || exit 1
-    echo ""
-    echo "Theme assets installation completed successfully."
+    log_phase "Theme Assets Summary"
+    log_success "Theme assets installation completed successfully."
 }
 
 main "$@"

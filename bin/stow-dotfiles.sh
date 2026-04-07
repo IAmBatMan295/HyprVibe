@@ -4,11 +4,18 @@ set -uE -o pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-DOTFILES_DIR="${ROOT_DIR}/dotfiles"
-USER_HOME="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)"
-if [[ -z "$USER_HOME" ]]; then
-    USER_HOME="${HOME}"
+COMMON_LIB="${SCRIPT_DIR}/lib/common.sh"
+
+if [[ ! -r "$COMMON_LIB" ]]; then
+    echo "Error: Missing common helper library: $COMMON_LIB" >&2
+    exit 1
 fi
+
+# shellcheck disable=SC1090
+source "$COMMON_LIB"
+
+DOTFILES_DIR="${ROOT_DIR}/dotfiles"
+USER_HOME="$(resolve_user_home)"
 
 PACKAGES=(
     foot
@@ -36,7 +43,7 @@ PACKAGES=(
 require_command() {
     local cmd="$1"
     if ! command -v "$cmd" >/dev/null 2>&1; then
-        echo "Error: Required command not found: $cmd"
+        log_error "Required command not found: $cmd"
         return 1
     fi
 }
@@ -44,7 +51,7 @@ require_command() {
 require_directory() {
     local dir_path="$1"
     if [[ ! -d "$dir_path" ]]; then
-        echo "Error: Required directory missing: $dir_path"
+        log_error "Required directory missing: $dir_path"
         return 1
     fi
 }
@@ -75,7 +82,7 @@ remove_target_if_exists() {
     local target_path="$1"
 
     if ! is_safe_target_path "$target_path"; then
-        echo "Error: Unsafe target path for cleanup: $target_path"
+        log_error "Unsafe target path for cleanup: $target_path"
         return 1
     fi
 
@@ -116,6 +123,8 @@ preclean_package_targets() {
 }
 
 main() {
+    setup_colors
+
     require_command stow
     require_directory "$DOTFILES_DIR"
 
@@ -124,16 +133,18 @@ main() {
         require_directory "${DOTFILES_DIR}/${pkg}"
     done
 
-    echo "==> Preparing target paths for repo-first stow behavior"
+    log_phase "Stow Pre-clean"
+    log_info "Preparing target paths for repo-first stow behavior"
     for pkg in "${PACKAGES[@]}"; do
         preclean_package_targets "$pkg" || return 1
     done
 
-    echo "==> Stowing dotfiles packages into ${USER_HOME}"
+    log_phase "Stow Apply"
+    log_info "Stowing dotfiles packages into ${USER_HOME}"
     cd "$DOTFILES_DIR"
     stow -t "$USER_HOME" "${PACKAGES[@]}"
 
-    echo "==> Dotfiles stow step completed successfully."
+    log_success "Dotfiles stow step completed successfully."
 }
 
 main "$@"

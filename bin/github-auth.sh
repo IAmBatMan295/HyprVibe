@@ -2,6 +2,17 @@
 
 set -uE -o pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+COMMON_LIB="${SCRIPT_DIR}/lib/common.sh"
+
+if [[ ! -r "$COMMON_LIB" ]]; then
+	echo "Error: Missing common helper library: $COMMON_LIB" >&2
+	exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$COMMON_LIB"
+
 SSH_DIR="${HOME}/.ssh"
 GITHUB_KEY="${SSH_DIR}/id_ed25519"
 GITLAB_KEY="${SSH_DIR}/id_ed25519_gitlab"
@@ -15,28 +26,9 @@ ensure_ssh_dir() {
 require_command() {
 	local cmd="$1"
 	if ! command -v "$cmd" >/dev/null 2>&1; then
-		echo "Error: Required command not found: $cmd"
+		log_error "Required command not found: $cmd"
 		return 1
 	fi
-}
-
-read_from_tty() {
-	local prompt="$1"
-	local out_var="$2"
-	local input=""
-
-	if [[ -r /dev/tty ]]; then
-		if ! read -r -p "$prompt" input </dev/tty; then
-			return 1
-		fi
-	else
-		if ! read -r -p "$prompt" input; then
-			return 1
-		fi
-	fi
-
-	printf -v "$out_var" '%s' "$input"
-	return 0
 }
 
 regenerate_key() {
@@ -44,11 +36,11 @@ regenerate_key() {
 	local comment="$2"
 
 	if [[ -f "$key_path" || -f "${key_path}.pub" ]]; then
-		echo "==> Replacing existing SSH key: $key_path"
+		log_warn "Replacing existing SSH key: $key_path"
 		rm -f "$key_path" "${key_path}.pub"
 	fi
 
-	echo "==> Generating SSH key: $key_path"
+	log_info "Generating SSH key: $key_path"
 	ssh-keygen -q -t ed25519 -C "$comment" -f "$key_path" -N ""
 }
 
@@ -72,18 +64,18 @@ EOF
 
 show_public_keys() {
 	if [[ ! -f "${GITHUB_KEY}.pub" || ! -f "${GITLAB_KEY}.pub" ]]; then
-		echo "Error: Could not find one or both generated public keys."
+		log_error "Could not find one or both generated public keys."
 		return 1
 	fi
 
-	echo ""
-	echo "==> GitHub public key (add this to GitHub SSH keys):"
+	log_phase "GitHub Public Key"
+	log_info "Add this key in GitHub SSH keys"
 	echo "----- BEGIN GITHUB PUBLIC KEY -----"
 	cat "${GITHUB_KEY}.pub"
 	echo "----- END GITHUB PUBLIC KEY -----"
 
-	echo ""
-	echo "==> GitLab public key (add this to GitLab SSH keys):"
+	log_phase "GitLab Public Key"
+	log_info "Add this key in GitLab SSH keys"
 	echo "----- BEGIN GITLAB PUBLIC KEY -----"
 	cat "${GITLAB_KEY}.pub"
 	echo "----- END GITLAB PUBLIC KEY -----"
@@ -94,7 +86,7 @@ confirm_keys_added() {
 	local answer
 	while true; do
 		if ! read_from_tty "Have you added BOTH keys to GitHub and GitLab? [y/N]: " answer; then
-			echo "Error: Interactive input is required to confirm SSH key upload."
+			log_error "Interactive input is required to confirm SSH key upload."
 			return 1
 		fi
 
@@ -103,16 +95,19 @@ confirm_keys_added() {
 				return 0
 				;;
 			n|no|"")
-				echo "Please add both keys first, then confirm with 'y'."
+				log_warn "Please add both keys first, then confirm with 'y'."
 				;;
 			*)
-				echo "Please answer yes or no."
+				log_warn "Please answer yes or no."
 				;;
 		esac
 	done
 }
 
 main() {
+	setup_colors
+	log_phase "SSH Key Setup"
+
 	require_command ssh-keygen || exit 1
 	require_command cat || exit 1
 
@@ -123,7 +118,7 @@ main() {
 	show_public_keys || exit 1
 	confirm_keys_added || exit 1
 
-	echo "==> GitHub/GitLab SSH setup complete."
+	log_success "GitHub/GitLab SSH setup complete."
 }
 
 main "$@"
