@@ -7,6 +7,8 @@ HYPRVIBE_REPO_URL="${HYPRVIBE_REPO_URL:-https://github.com/IAmBatMan295/HyprVibe
 USER_HOME="${HOME}"
 HYPRVIBE_TARGET_DIR="${USER_HOME}/HyprVibe"
 MODULES_DIR="$SCRIPT_DIR"
+INSTALL_START_DIR="$(pwd -P)"
+INSTALL_LOG_FILE="${INSTALL_START_DIR}/hyprvibe-log.txt"
 SUDO_KEEPALIVE_PID=""
 CLONE_TMP_DIR=""
 
@@ -17,6 +19,28 @@ on_error() {
 }
 
 trap 'on_error "$LINENO" "$?"' ERR
+
+setup_run_logging() {
+    if [[ "${HYPRVIBE_LOGGING_ACTIVE:-0}" == "1" ]]; then
+        return 0
+    fi
+
+    if ! : >"$INSTALL_LOG_FILE"; then
+        echo "Error: Failed to create log file at ${INSTALL_LOG_FILE}."
+        exit 1
+    fi
+
+    export HYPRVIBE_LOGGING_ACTIVE=1
+    export HYPRVIBE_INSTALL_LOG_FILE="$INSTALL_LOG_FILE"
+
+    if command -v stdbuf >/dev/null 2>&1; then
+        exec > >(stdbuf -o0 -e0 tee "$INSTALL_LOG_FILE") 2>&1
+    else
+        exec > >(tee "$INSTALL_LOG_FILE") 2>&1
+    fi
+
+    echo "==> Logging installer output to ${INSTALL_LOG_FILE}"
+}
 
 require_interactive_tty() {
     if [[ -r /dev/tty ]]; then
@@ -156,6 +180,8 @@ run_module() {
 }
 
 main() {
+    setup_run_logging
+
     refresh_hyprvibe_clone "$@"
 
     if [[ "${EUID}" -eq 0 ]]; then
