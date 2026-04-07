@@ -90,6 +90,20 @@ yamis_installed() {
     [[ -f "${YAMIS_DIR_USER}/index.theme" || -f "${YAMIS_DIR_SYSTEM}/index.theme" ]]
 }
 
+current_yamis_location() {
+    if [[ -f "${YAMIS_DIR_USER}/index.theme" ]]; then
+        printf '%s\n' "${YAMIS_DIR_USER}"
+        return 0
+    fi
+
+    if [[ -f "${YAMIS_DIR_SYSTEM}/index.theme" ]]; then
+        printf '%s\n' "${YAMIS_DIR_SYSTEM}"
+        return 0
+    fi
+
+    return 1
+}
+
 detect_theme_dir() {
     local repo_dir="$1"
 
@@ -128,7 +142,13 @@ try_extract_archive_theme_dir() {
 
 install_yamis_once() {
     if yamis_installed; then
-        echo "==> YAMIS already installed. Skipping clone/install."
+        local existing_path
+        existing_path="$(current_yamis_location || true)"
+        if [[ -n "$existing_path" ]]; then
+            echo "==> YAMIS already installed at ${existing_path}. Skipping clone/install."
+        else
+            echo "==> YAMIS already installed. Skipping clone/install."
+        fi
         return 0
     fi
 
@@ -171,6 +191,8 @@ install_yamis_once() {
         fi
     fi
 
+    echo "==> Using YAMIS theme files from: ${theme_dir}"
+
     mkdir -p "$ICONS_DIR" || {
         rm -rf "$tmp_dir"
         return 1
@@ -186,6 +208,14 @@ install_yamis_once() {
         rm -rf "$tmp_dir"
         return 1
     }
+
+    if [[ ! -f "${YAMIS_DIR_USER}/index.theme" ]]; then
+        echo "Error: YAMIS install verification failed: missing ${YAMIS_DIR_USER}/index.theme"
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    echo "==> YAMIS installed to ${YAMIS_DIR_USER}"
 
     if command -v gtk-update-icon-cache >/dev/null 2>&1; then
         gtk-update-icon-cache -f -t "$YAMIS_DIR_USER" >/dev/null 2>&1 || true
