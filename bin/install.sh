@@ -2,13 +2,16 @@
 
 set -eEuo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${SCRIPT_SOURCE}")" && pwd)"
 HYPRVIBE_REPO_URL="${HYPRVIBE_REPO_URL:-https://github.com/IAmBatMan295/HyprVibe.git}"
-USER_HOME="${HOME}"
+USER_HOME="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)"
+if [[ -z "$USER_HOME" ]]; then
+    USER_HOME="${HOME}"
+fi
 HYPRVIBE_TARGET_DIR="${USER_HOME}/HyprVibe"
 MODULES_DIR="$SCRIPT_DIR"
-INSTALL_START_DIR="$(pwd -P)"
-INSTALL_LOG_FILE="${INSTALL_START_DIR}/hyprvibe-log.txt"
+INSTALL_LOG_FILE="${USER_HOME}/hyprvibe-log.txt"
 SUDO_KEEPALIVE_PID=""
 CLONE_TMP_DIR=""
 
