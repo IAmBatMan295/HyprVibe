@@ -10,6 +10,17 @@ YAY_LIST=""
 PACKAGE_PROFILE=""
 MIN_ATTEMPTS=3
 
+YAY_INSTALL_FLAGS=(
+    --needed
+    --sudoloop
+    --useask
+    --answerclean None
+    --answerdiff None
+    --answeredit None
+    --answerupgrade None
+    --noremovemake
+)
+
 read_from_tty() {
     local prompt="$1"
     local out_var="$2"
@@ -27,6 +38,14 @@ read_from_tty() {
 
     printf -v "$out_var" '%s' "$input"
     return 0
+}
+
+run_with_tty_stdin() {
+    if [[ -r /dev/tty ]]; then
+        "$@" </dev/tty
+    else
+        "$@"
+    fi
 }
 
 detect_package_profile() {
@@ -192,7 +211,7 @@ bootstrap_yay_once() {
     fi
 
     echo "==> yay not found. Installing from AUR git repository"
-    sudo pacman -S --needed base-devel git || return 1
+    run_with_tty_stdin sudo pacman -S --needed base-devel git || return 1
 
     local tmp_dir
     tmp_dir="$(mktemp -d)" || return 1
@@ -207,7 +226,7 @@ bootstrap_yay_once() {
         return 1
     }
 
-    if ! makepkg -si; then
+    if ! run_with_tty_stdin makepkg -si; then
         popd >/dev/null
         rm -rf "$tmp_dir"
         return 1
@@ -227,7 +246,7 @@ setup_reflector_once() {
     if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
         if ! command -v cachyos-rate-mirrors >/dev/null 2>&1; then
             echo "==> cachyos-rate-mirrors not found. Installing it first"
-            sudo pacman -S --needed cachyos-rate-mirrors || return 1
+            run_with_tty_stdin sudo pacman -S --needed cachyos-rate-mirrors || return 1
         fi
 
         echo "==> Running cachyos-rate-mirrors for CachyOS mirrorlists"
@@ -238,7 +257,7 @@ setup_reflector_once() {
 
     if ! command -v reflector >/dev/null 2>&1; then
         echo "==> reflector not found. Installing reflector first"
-        sudo pacman -S --needed reflector || return 1
+        run_with_tty_stdin sudo pacman -S --needed reflector || return 1
     fi
 
     run_reflector_for_target "/etc/pacman.d/mirrorlist" || return 1
@@ -265,6 +284,74 @@ verify_reflector_setup() {
 PACMAN_PKGS=()
 YAY_PKGS=()
 
+install_pacman_with_fallback() {
+    local -a targets=("$@")
+    local -a failed=()
+    local pkg
+
+    if (( ${#targets[@]} == 0 )); then
+        return 0
+    fi
+
+    if run_with_tty_stdin sudo pacman -S --needed --ask=4 "${targets[@]}"; then
+        return 0
+    fi
+
+    echo "==> Bulk pacman transaction failed; retrying package-by-package"
+
+    for pkg in "${targets[@]}"; do
+        if pacman -Q "$pkg" >/dev/null 2>&1; then
+            continue
+        fi
+
+        echo "==> Installing pacman package: ${pkg}"
+        if ! run_with_tty_stdin sudo pacman -S --needed --ask=4 "$pkg"; then
+            failed+=("$pkg")
+        fi
+    done
+
+    if (( ${#failed[@]} > 0 )); then
+        echo "Pacman packages still failing: ${failed[*]}"
+        return 1
+    fi
+
+    return 0
+}
+
+install_yay_with_fallback() {
+    local -a targets=("$@")
+    local -a failed=()
+    local pkg
+
+    if (( ${#targets[@]} == 0 )); then
+        return 0
+    fi
+
+    if run_with_tty_stdin yay -S "${YAY_INSTALL_FLAGS[@]}" "${targets[@]}"; then
+        return 0
+    fi
+
+    echo "==> Bulk yay transaction failed; retrying package-by-package"
+
+    for pkg in "${targets[@]}"; do
+        if pacman -Q "$pkg" >/dev/null 2>&1; then
+            continue
+        fi
+
+        echo "==> Installing yay package: ${pkg}"
+        if ! run_with_tty_stdin yay -S "${YAY_INSTALL_FLAGS[@]}" "$pkg"; then
+            failed+=("$pkg")
+        fi
+    done
+
+    if (( ${#failed[@]} > 0 )); then
+        echo "Yay packages still failing: ${failed[*]}"
+        return 1
+    fi
+
+    return 0
+}
+
 install_pacman_once() {
     if (( ${#PACMAN_PKGS[@]} == 0 )); then
         return 0
@@ -279,7 +366,7 @@ install_pacman_once() {
     fi
 
     echo "==> Installing ${#missing[@]} missing pacman package(s)"
-    sudo pacman -S --needed "${missing[@]}"
+    install_pacman_with_fallback "${missing[@]}"
 }
 
 verify_pacman_install() {
@@ -299,7 +386,16 @@ install_yay_packages_once() {
         return 0
     fi
 
-    yay -S --needed --sudoloop "${YAY_PKGS[@]}"
+    local missing=()
+    missing_packages YAY_PKGS missing
+
+    if (( ${#missing[@]} == 0 )); then
+        echo "==> All yay packages are already installed; skipping yay install"
+        return 0
+    fi
+
+    echo "==> Installing ${#missing[@]} missing yay package(s)"
+    install_yay_with_fallback "${missing[@]}"
 }
 
 verify_yay_install() {
