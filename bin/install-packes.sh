@@ -199,6 +199,29 @@ should_run_mirror_ranking() {
     done
 }
 
+should_run_post_pacman_recheck() {
+    local answer
+
+    while true; do
+        if ! read_from_tty "Run post-pacman missing-package recheck pass? [Y/n]: " answer; then
+            echo "Warning: Interactive input unavailable; running post-pacman recheck."
+            return 0
+        fi
+
+        case "${answer,,}" in
+            y|yes|"")
+                return 0
+                ;;
+            n|no)
+                return 1
+                ;;
+            *)
+                echo "Please answer yes or no."
+                ;;
+        esac
+    done
+}
+
 should_run_slow_fallback() {
     local manager_name="$1"
     local answer
@@ -505,6 +528,13 @@ main() {
     fi
 
     run_with_retries "Install pacman packages" install_pacman_once verify_pacman_install
+
+    if should_run_post_pacman_recheck; then
+        run_with_retries "Post-pacman missing package pass" install_pacman_once verify_pacman_install
+    else
+        echo "==> Skipping post-pacman missing-package recheck by user choice"
+    fi
+
     run_with_retries "Install yay helper" bootstrap_yay_once bootstrap_yay_verify
     run_with_retries "Install yay packages" install_yay_packages_once verify_yay_install
 
