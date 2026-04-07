@@ -9,6 +9,7 @@ PACMAN_LIST=""
 YAY_LIST=""
 PACKAGE_PROFILE=""
 MIN_ATTEMPTS=3
+PACMAN_SYSUPGRADE_DONE=0
 
 YAY_INSTALL_FLAGS=(
     --needed
@@ -198,6 +199,30 @@ should_run_mirror_ranking() {
     done
 }
 
+should_run_slow_fallback() {
+    local manager_name="$1"
+    local answer
+
+    while true; do
+        if ! read_from_tty "Bulk ${manager_name} install failed. Run slower package-by-package fallback? [y/N]: " answer; then
+            echo "Warning: Interactive input unavailable; skipping package-by-package fallback."
+            return 1
+        fi
+
+        case "${answer,,}" in
+            y|yes)
+                return 0
+                ;;
+            n|no|"")
+                return 1
+                ;;
+            *)
+                echo "Please answer yes or no."
+                ;;
+        esac
+    done
+}
+
 run_with_retries() {
     local step_name="$1"
     local command_fn="$2"
@@ -307,6 +332,19 @@ verify_reflector_setup() {
 PACMAN_PKGS=()
 YAY_PKGS=()
 
+sync_and_upgrade_system_once() {
+    if (( PACMAN_SYSUPGRADE_DONE == 1 )); then
+        return 0
+    fi
+
+    echo "==> Syncing package databases and upgrading system packages first"
+    echo "==> This prevents dependency breakage during large package installs"
+    run_with_tty_stdin sudo pacman -Syu || return 1
+
+    PACMAN_SYSUPGRADE_DONE=1
+    return 0
+}
+
 install_pacman_with_fallback() {
     local -a targets=("$@")
     local -a failed=()
@@ -318,6 +356,11 @@ install_pacman_with_fallback() {
 
     if run_with_tty_stdin sudo pacman -S --needed --ask=4 "${targets[@]}"; then
         return 0
+    fi
+
+    if ! should_run_slow_fallback "pacman"; then
+        echo "==> Skipping package-by-package pacman fallback"
+        return 1
     fi
 
     echo "==> Bulk pacman transaction failed; retrying package-by-package"
@@ -354,6 +397,11 @@ install_yay_with_fallback() {
         return 0
     fi
 
+    if ! should_run_slow_fallback "yay"; then
+        echo "==> Skipping package-by-package yay fallback"
+        return 1
+    fi
+
     echo "==> Bulk yay transaction failed; retrying package-by-package"
 
     for pkg in "${targets[@]}"; do
@@ -387,6 +435,8 @@ install_pacman_once() {
         echo "==> All pacman packages are already installed; skipping pacman install"
         return 0
     fi
+
+    sync_and_upgrade_system_once || return 1
 
     echo "==> Installing ${#missing[@]} missing pacman package(s)"
     install_pacman_with_fallback "${missing[@]}"
