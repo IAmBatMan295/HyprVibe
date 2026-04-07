@@ -175,6 +175,29 @@ prompt_retry() {
     done
 }
 
+should_run_mirror_ranking() {
+    local answer
+
+    while true; do
+        if ! read_from_tty "Run mirror ranking now? [Y/n]: " answer; then
+            echo "Warning: Interactive input unavailable; proceeding with mirror ranking."
+            return 0
+        fi
+
+        case "${answer,,}" in
+            y|yes|"")
+                return 0
+                ;;
+            n|no)
+                return 1
+                ;;
+            *)
+                echo "Please answer yes or no."
+                ;;
+        esac
+    done
+}
+
 run_with_retries() {
     local step_name="$1"
     local command_fn="$2"
@@ -425,7 +448,12 @@ main() {
     load_packages "$PACMAN_LIST" PACMAN_PKGS
     load_packages "$YAY_LIST" YAY_PKGS
 
-    run_with_retries "Setup reflector mirrors" setup_reflector_once verify_reflector_setup
+    if should_run_mirror_ranking; then
+        run_with_retries "Setup reflector mirrors" setup_reflector_once verify_reflector_setup
+    else
+        echo "==> Skipping mirror ranking by user choice"
+    fi
+
     run_with_retries "Install pacman packages" install_pacman_once verify_pacman_install
     run_with_retries "Install yay helper" bootstrap_yay_once bootstrap_yay_verify
     run_with_retries "Install yay packages" install_yay_packages_once verify_yay_install
