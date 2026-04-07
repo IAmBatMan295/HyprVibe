@@ -5,6 +5,10 @@ set -uE -o pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 DOTFILES_DIR="${ROOT_DIR}/dotfiles"
+USER_HOME="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)"
+if [[ -z "$USER_HOME" ]]; then
+    USER_HOME="${HOME}"
+fi
 
 PACKAGES=(
     foot
@@ -50,8 +54,8 @@ is_safe_target_path() {
     local resolved_home
     local resolved_target
 
-    resolved_home="$(realpath -m "$HOME")"
-    resolved_target="$(realpath -m "$target_path")"
+    resolved_home="$(realpath -ms "$USER_HOME")"
+    resolved_target="$(realpath -ms "$target_path")"
 
     if [[ "$resolved_target" == "$resolved_home" || "$resolved_target" == "/" ]]; then
         return 1
@@ -88,15 +92,15 @@ preclean_package_targets() {
 
     if [[ "$pkg" == "Code" ]]; then
         # VS Code: replace only settings.json, keep extensions/state/cache intact.
-        mkdir -p "${HOME}/.config/Code/User"
-        remove_target_if_exists "${HOME}/.config/Code/User/settings.json" || return 1
+        mkdir -p "${USER_HOME}/.config/Code/User"
+        remove_target_if_exists "${USER_HOME}/.config/Code/User/settings.json" || return 1
         return 0
     fi
 
     if [[ -d "${pkg_dir}/.config" ]]; then
         local cfg_entry
         while IFS= read -r -d '' cfg_entry; do
-            remove_target_if_exists "${HOME}/.config/$(basename "$cfg_entry")" || return 1
+            remove_target_if_exists "${USER_HOME}/.config/$(basename "$cfg_entry")" || return 1
         done < <(find "${pkg_dir}/.config" -mindepth 1 -maxdepth 1 -print0)
     fi
 
@@ -105,7 +109,7 @@ preclean_package_targets() {
         if [[ "$(basename "$top_entry")" == ".config" ]]; then
             continue
         fi
-        remove_target_if_exists "${HOME}/$(basename "$top_entry")" || return 1
+        remove_target_if_exists "${USER_HOME}/$(basename "$top_entry")" || return 1
     done < <(find "$pkg_dir" -mindepth 1 -maxdepth 1 -name ".*" -print0)
 
     return 0
@@ -125,9 +129,9 @@ main() {
         preclean_package_targets "$pkg" || return 1
     done
 
-    echo "==> Stowing dotfiles packages into ${HOME}"
+    echo "==> Stowing dotfiles packages into ${USER_HOME}"
     cd "$DOTFILES_DIR"
-    stow -t "$HOME" "${PACKAGES[@]}"
+    stow -t "$USER_HOME" "${PACKAGES[@]}"
 
     echo "==> Dotfiles stow step completed successfully."
 }

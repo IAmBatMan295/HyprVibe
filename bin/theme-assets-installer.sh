@@ -3,7 +3,11 @@
 set -uE -o pipefail
 
 MIN_ATTEMPTS=3
-ICONS_DIR="${HOME}/.local/share/icons"
+USER_HOME="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)"
+if [[ -z "$USER_HOME" ]]; then
+    USER_HOME="${HOME}"
+fi
+ICONS_DIR="${USER_HOME}/.local/share/icons"
 YAMIS_DIR_USER="${ICONS_DIR}/YAMIS"
 YAMIS_DIR_SYSTEM="/usr/share/icons/YAMIS"
 
@@ -95,13 +99,31 @@ detect_theme_dir() {
     fi
 
     local candidate
-    candidate="$(find "$repo_dir" -maxdepth 3 -type f -name index.theme | head -n 1 || true)"
+    candidate="$(find "$repo_dir" -maxdepth 6 -type f -name index.theme | head -n 1 || true)"
     if [[ -n "$candidate" ]]; then
         dirname "$candidate"
         return 0
     fi
 
     return 1
+}
+
+try_extract_archive_theme_dir() {
+    local source_dir="$1"
+    local unpack_dir="$2"
+
+    local archive_file
+    archive_file="$(find "$source_dir" -maxdepth 3 -type f \( -name '*.tar.gz' -o -name '*.tgz' -o -name '*.tar.xz' -o -name '*.tar.zst' \) | head -n 1 || true)"
+    if [[ -z "$archive_file" ]]; then
+        return 1
+    fi
+
+    mkdir -p "$unpack_dir" || return 1
+    if ! tar -xf "$archive_file" -C "$unpack_dir"; then
+        return 1
+    fi
+
+    detect_theme_dir "$unpack_dir"
 }
 
 install_yamis_once() {
@@ -141,9 +163,12 @@ install_yamis_once() {
 
     local theme_dir
     if ! theme_dir="$(detect_theme_dir "$cloned_dir")"; then
-        echo "Error: Could not find YAMIS theme files in cloned repository."
-        rm -rf "$tmp_dir"
-        return 1
+        local extracted_dir="${tmp_dir}/extracted"
+        if ! theme_dir="$(try_extract_archive_theme_dir "$cloned_dir" "$extracted_dir")"; then
+            echo "Error: Could not find YAMIS theme files in cloned repository."
+            rm -rf "$tmp_dir"
+            return 1
+        fi
     fi
 
     mkdir -p "$ICONS_DIR" || {
@@ -175,7 +200,7 @@ verify_yamis_install() {
 }
 
 main() {
-    run_with_retries "Install YAMIS icon theme" install_yamis_once verify_yamis_install
+    run_with_retries "Install YAMIS icon theme" install_yamis_once verify_yamis_install || exit 1
     echo ""
     echo "Theme assets installation completed successfully."
 }

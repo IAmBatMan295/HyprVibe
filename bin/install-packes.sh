@@ -150,6 +150,25 @@ missing_packages() {
     done
 }
 
+missing_packages_with_providers() {
+    local -n all_pkgs="$1"
+    local -n missing_out="$2"
+    missing_out=()
+
+    local pkg
+    local unresolved
+    for pkg in "${all_pkgs[@]}"; do
+        if pacman -Q "$pkg" >/dev/null 2>&1; then
+            continue
+        fi
+
+        unresolved="$(pacman -T "$pkg" 2>/dev/null || true)"
+        if [[ -n "$unresolved" ]]; then
+            missing_out+=("$pkg")
+        fi
+    done
+}
+
 prompt_retry() {
     local attempt="$1"
     local step_name="$2"
@@ -411,6 +430,7 @@ install_yay_with_fallback() {
     local -a targets=("$@")
     local -a failed=()
     local pkg
+    local unresolved
 
     if (( ${#targets[@]} == 0 )); then
         return 0
@@ -428,7 +448,8 @@ install_yay_with_fallback() {
     echo "==> Bulk yay transaction failed; retrying package-by-package"
 
     for pkg in "${targets[@]}"; do
-        if pacman -Q "$pkg" >/dev/null 2>&1; then
+        unresolved="$(pacman -T "$pkg" 2>/dev/null || true)"
+        if [[ -z "$unresolved" ]]; then
             continue
         fi
 
@@ -483,7 +504,7 @@ install_yay_packages_once() {
     fi
 
     local missing=()
-    missing_packages YAY_PKGS missing
+    missing_packages_with_providers YAY_PKGS missing
 
     if (( ${#missing[@]} == 0 )); then
         echo "==> All yay packages are already installed; skipping yay install"
@@ -496,7 +517,7 @@ install_yay_packages_once() {
 
 verify_yay_install() {
     local missing=()
-    missing_packages YAY_PKGS missing
+    missing_packages_with_providers YAY_PKGS missing
 
     if (( ${#missing[@]} > 0 )); then
         echo "Missing yay packages: ${missing[*]}"
@@ -522,21 +543,21 @@ main() {
     load_packages "$YAY_LIST" YAY_PKGS
 
     if should_run_mirror_ranking; then
-        run_with_retries "Setup reflector mirrors" setup_reflector_once verify_reflector_setup
+        run_with_retries "Setup reflector mirrors" setup_reflector_once verify_reflector_setup || exit 1
     else
         echo "==> Skipping mirror ranking by user choice"
     fi
 
-    run_with_retries "Install pacman packages" install_pacman_once verify_pacman_install
+    run_with_retries "Install pacman packages" install_pacman_once verify_pacman_install || exit 1
 
     if should_run_post_pacman_recheck; then
-        run_with_retries "Post-pacman missing package pass" install_pacman_once verify_pacman_install
+        run_with_retries "Post-pacman missing package pass" install_pacman_once verify_pacman_install || exit 1
     else
         echo "==> Skipping post-pacman missing-package recheck by user choice"
     fi
 
-    run_with_retries "Install yay helper" bootstrap_yay_once bootstrap_yay_verify
-    run_with_retries "Install yay packages" install_yay_packages_once verify_yay_install
+    run_with_retries "Install yay helper" bootstrap_yay_once bootstrap_yay_verify || exit 1
+    run_with_retries "Install yay packages" install_yay_packages_once verify_yay_install || exit 1
 
     echo ""
     echo "All package installation steps completed successfully."
