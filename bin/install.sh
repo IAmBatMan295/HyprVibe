@@ -21,28 +21,44 @@ else
         fi
     }
 
+    COLOR_RESET=""
+    COLOR_BOLD=""
+    COLOR_BLUE=""
+    COLOR_GREEN=""
+    COLOR_YELLOW=""
+    COLOR_RED=""
+    COLOR_CYAN=""
+
     setup_colors() {
-        :
+        if [[ -z "${NO_COLOR:-}" ]]; then
+            COLOR_RESET=$'\033[0m'
+            COLOR_BOLD=$'\033[1m'
+            COLOR_BLUE=$'\033[34m'
+            COLOR_GREEN=$'\033[32m'
+            COLOR_YELLOW=$'\033[33m'
+            COLOR_RED=$'\033[31m'
+            COLOR_CYAN=$'\033[36m'
+        fi
     }
 
     log_phase() {
-        printf "\n==> %s\n" "$1"
+        printf "\n%s%s==> %s%s\n" "$COLOR_BOLD" "$COLOR_BLUE" "$1" "$COLOR_RESET"
     }
 
     log_info() {
-        printf "[INFO] %s\n" "$1"
+        printf "%s[INFO]%s %s\n" "$COLOR_CYAN" "$COLOR_RESET" "$1"
     }
 
     log_success() {
-        printf "[OK] %s\n" "$1"
+        printf "%s[OK]%s %s\n" "$COLOR_GREEN" "$COLOR_RESET" "$1"
     }
 
     log_warn() {
-        printf "[WARN] %s\n" "$1"
+        printf "%s[WARN]%s %s\n" "$COLOR_YELLOW" "$COLOR_RESET" "$1"
     }
 
     log_error() {
-        printf "[ERROR] %s\n" "$1" >&2
+        printf "%s[ERROR]%s %s\n" "$COLOR_RED" "$COLOR_RESET" "$1" >&2
     }
 fi
 
