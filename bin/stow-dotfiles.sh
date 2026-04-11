@@ -37,7 +37,6 @@ PACKAGES=(
     shell-config
     tmux
     waybar
-    Code
 )
 
 require_command() {
@@ -96,13 +95,6 @@ remove_target_if_exists() {
 preclean_package_targets() {
     local pkg="$1"
     local pkg_dir="${DOTFILES_DIR}/${pkg}"
-
-    if [[ "$pkg" == "Code" ]]; then
-        # VS Code: replace only settings.json, keep extensions/state/cache intact.
-        mkdir -p "${USER_HOME}/.config/Code/User"
-        remove_target_if_exists "${USER_HOME}/.config/Code/User/settings.json" || return 1
-        return 0
-    fi
 
     if [[ -d "${pkg_dir}/.config" ]]; then
         local cfg_entry

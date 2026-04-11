@@ -257,7 +257,6 @@ main() {
     run_module "github-auth.sh" || exit 1
     run_module "install-packes.sh" || exit 1
     run_module "theme-assets-installer.sh" || exit 1
-    run_module "stow-dotfiles.sh" || exit 1
     run_module "miscellenious.sh" || exit 1
 
     log_phase "Installer Summary"

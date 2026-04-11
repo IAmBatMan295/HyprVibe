@@ -75,7 +75,6 @@ cblas
 cdparanoia
 chafa
 chromaprint
-chromium
 cifs-utils
 cinnamon-desktop
 clang
