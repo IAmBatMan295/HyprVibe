@@ -12,4 +12,3 @@ ryzen_smu-dkms-git
 visual-studio-code-bin
 wifitui-bin
 xcursor-simp1e
-zen-browser-bin
