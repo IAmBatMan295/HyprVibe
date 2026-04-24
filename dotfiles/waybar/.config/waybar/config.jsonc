@@ -1,5 +1,6 @@
 {
   "reload_style_on_change": true,
+  "on-sigusr1": "toggle",
   "style": "~/.config/waybar/style.css",
   "layer": "top",
   "position": "top",

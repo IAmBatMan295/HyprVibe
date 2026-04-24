@@ -234,6 +234,7 @@ hyprgraphics
 hyprland
 hyprland-guiutils
 hyprland-qt-support
+hypridle
 hyprlang
 hyprlock
 hyprsunset
