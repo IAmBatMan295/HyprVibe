@@ -69,6 +69,20 @@ enable_service_if_present() {
     systemctl --user enable --now "$service"
 }
 
+prepare_mpd_environment() {
+    local mpd_config_dir="${USER_HOME}/.config/mpd"
+    local mpd_config_file="${mpd_config_dir}/mpd.conf"
+    local mpd_playlists_dir="${mpd_config_dir}/playlists"
+    local mpd_music_dir="${USER_HOME}/Music/music"
+
+    log_info "Preparing MPD directories"
+    mkdir -p "$mpd_config_dir" "$mpd_playlists_dir" "$mpd_music_dir"
+
+    if [[ ! -f "$mpd_config_file" ]]; then
+        log_warn "MPD config not found at ${mpd_config_file}; ensure dotfiles stow ran before this step."
+    fi
+}
+
 enable_services() {
     local -a global_services=(
         "NetworkManager.service"
@@ -91,6 +105,7 @@ enable_services() {
     done
 
     log_info "Enabling user services with --now"
+    prepare_mpd_environment
     for service in "${user_services[@]}"; do
         enable_service_if_present "user" "$service"
     done
