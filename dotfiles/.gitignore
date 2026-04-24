@@ -20,3 +20,4 @@ mpv/.config/mpv/fonts/uosc_textures.ttf
 
 # Personal file manager shortcuts.
 gtk-3.0/.config/gtk-3.0/bookmarks
+mpd/.config/mpd/state
