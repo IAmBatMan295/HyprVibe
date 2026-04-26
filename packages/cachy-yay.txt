@@ -9,5 +9,5 @@ preload
 puddletag
 rsgain
 ryzen_smu-dkms-git
-wifitui-bin
+nmgui-bin
 xcursor-simp1e
