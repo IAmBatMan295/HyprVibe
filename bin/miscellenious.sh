@@ -168,11 +168,48 @@ setup_plymouth_glitch() {
     fi
 }
 
+setup_grub_theme() {
+    log_phase "GRUB Theme Setup"
+
+    local grub_local_dir="${SCRIPT_DIR}/../grub-theme/CRT-Amber-GRUB-Theme"
+    local sys_grub_dir="/usr/share/grub/themes/CRT-Amber-GRUB-Theme"
+    local theme_txt_path="${sys_grub_dir}/theme.txt"
+
+    if [[ -d "$grub_local_dir" ]]; then
+        log_info "Installing GRUB 'CRT-Amber' theme from repository"
+        sudo mkdir -p "/usr/share/grub/themes/"
+        sudo cp -a "$grub_local_dir" "/usr/share/grub/themes/"
+    else
+        log_warn "GRUB theme not found in $grub_local_dir. Assuming already installed."
+    fi
+
+    log_info "Updating /etc/default/grub..."
+    # Idempotent inject or replace GRUB_THEME
+    if grep -q "^GRUB_THEME=" /etc/default/grub; then
+        sudo sed -i -E "s|^GRUB_THEME=.*|GRUB_THEME='${theme_txt_path}'|g" /etc/default/grub
+    else
+        echo "GRUB_THEME='${theme_txt_path}'" | sudo tee -a /etc/default/grub >/dev/null
+    fi
+
+    log_info "Enabling GRUB OS Prober for dual boot..."
+    sudo sed -i -E 's|^#?GRUB_DISABLE_OS_PROBER=.*|GRUB_DISABLE_OS_PROBER=false|' /etc/default/grub
+
+    log_info "Rebuilding GRUB config..."
+    sudo grub-mkconfig -o /boot/grub/grub.cfg
+    log_success "GRUB theme applied."
+}
+
 main() {
     setup_colors
 
+    log_info "Requesting sudo privileges upfront to avoid mid-script stalls..."
+    sudo -v
+    # Keep-alive sudo to prevent timeout during long operations
+    while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
     install_uosc_stack
     setup_plymouth_glitch
+    setup_grub_theme
     enable_services
 }
 
