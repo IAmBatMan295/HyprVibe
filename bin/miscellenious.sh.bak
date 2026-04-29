@@ -142,37 +142,10 @@ install_uosc_stack() {
     log_success "uosc + thumbfast install complete"
 }
 
-setup_plymouth_glitch() {
-    log_phase "Plymouth & Early KMS Setup"
-
-    local plymouth_local_dir="${SCRIPT_DIR}/../plymouth-theme/glitch"
-    local sys_plymouth_dir="/usr/share/plymouth/themes/glitch"
-
-    if [[ -d "$plymouth_local_dir" ]]; then
-        log_info "Installing Plymouth 'glitch' theme from repository"
-        sudo cp -a "$plymouth_local_dir" "/usr/share/plymouth/themes/"
-    else
-        log_warn "Plymouth theme 'glitch' not found in $plymouth_local_dir. Assuming already installed or skipping default copy."
-    fi
-
-    log_info "Injecting amdgpu into mkinitcpio for Early KMS..."
-    sudo sed -i -E '/^MODULES=\(/ { /\bamdgpu\b/! s/^MODULES=\(/MODULES=(amdgpu / }' /etc/mkinitcpio.conf
-
-    log_info "Applying theme and rebuilding initramfs (-R flag)..."
-    if command -v plymouth-set-default-theme >/dev/null 2>&1; then
-        sudo plymouth-set-default-theme -R glitch || sudo mkinitcpio -P
-        log_success "Plymouth early KMS glitch theme applied."
-    else
-        log_warn "Plymouth CLI missing! Falling back to raw mkinitcpio -P."
-        sudo mkinitcpio -P
-    fi
-}
-
 main() {
     setup_colors
 
     install_uosc_stack
-    setup_plymouth_glitch
     enable_services
 }
 
