@@ -15,6 +15,8 @@ source "$COMMON_LIB"
 
 USER_HOME="$(resolve_user_home)"
 
+mkdir -p "${USER_HOME}/Pictures/Screenshots" "${USER_HOME}/Pictures/Recordings"
+
 MPV_DIR="${USER_HOME}/.config/mpv"
 SCRIPTS_DIR="${MPV_DIR}/scripts"
 SCRIPT_OPTS_DIR="${MPV_DIR}/script-opts"
@@ -199,6 +201,47 @@ setup_grub_theme() {
     log_success "GRUB theme applied."
 }
 
+configure_flatpak_themes() {
+    log_phase "Flatpak Themes"
+    
+    if ! command -v flatpak >/dev/null 2>&1; then
+        log_warn "Flatpak missing. Skip."
+        return 0
+    fi
+
+    log_info "Override flatpak to dark theme"
+    flatpak override --user --filesystem="$HOME/.themes"
+    flatpak override --user --filesystem="$HOME/.icons"
+    flatpak override --user --filesystem="$HOME/.local/share/themes"
+    flatpak override --user --filesystem="$HOME/.local/share/icons"
+    flatpak override --user --filesystem="$HOME/.config/gtk-3.0:ro"
+    flatpak override --user --filesystem="$HOME/.config/gtk-4.0:ro"
+    flatpak override --user --env=GTK_THEME=adw-gtk3-dark
+    
+    log_success "Flatpak dark theme done"
+}
+
+configure_gsettings() {
+    log_phase "GSettings Configuration"
+
+    if ! command -v gsettings >/dev/null 2>&1; then
+        log_warn "gsettings missing. Skip."
+        return 0
+    fi
+
+    log_info "Set prefer-dark and foot terminal"
+    
+    # Dark mode
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark' 2>/dev/null || true
+    
+    # Terminal for various DE schemas (silently fail if schema does not exist)
+    gsettings set org.gnome.desktop.default-applications.terminal exec 'foot' 2>/dev/null || true
+    gsettings set org.cinnamon.desktop.default-applications.terminal exec 'foot' 2>/dev/null || true
+    gsettings set org.mate.applications-terminal exec 'foot' 2>/dev/null || true
+    
+    log_success "GSettings done"
+}
+
 main() {
     setup_colors
 
@@ -210,6 +253,8 @@ main() {
     install_uosc_stack
     setup_plymouth_glitch
     setup_grub_theme
+    configure_flatpak_themes
+    configure_gsettings
     enable_services
 }
 
