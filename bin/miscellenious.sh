@@ -106,6 +106,11 @@ enable_services() {
         enable_service_if_present "system" "$service"
     done
 
+    log_info "Disabling Wi-Fi power save"
+    sudo mkdir -p /etc/NetworkManager/conf.d
+    echo -e "[connection]\nwifi.powersave = 2" | sudo tee /etc/NetworkManager/conf.d/99-disable-wifi-powersave.conf > /dev/null
+    sudo systemctl restart NetworkManager
+
     log_info "Enabling user services with --now"
     prepare_mpd_environment
     for service in "${user_services[@]}"; do
