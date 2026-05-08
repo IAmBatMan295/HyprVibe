@@ -111,6 +111,14 @@ enable_services() {
     echo -e "[connection]\nwifi.powersave = 2" | sudo tee /etc/NetworkManager/conf.d/99-disable-wifi-powersave.conf > /dev/null
     sudo systemctl restart NetworkManager
 
+    log_info "Configuring UFW rules"
+    if command -v ufw >/dev/null 2>&1; then
+        sudo ufw allow 53317/tcp
+        sudo ufw allow 53317/udp
+    else
+        log_warn "ufw not found, skipping firewall rules"
+    fi
+
     log_info "Enabling user services with --now"
     prepare_mpd_environment
     for service in "${user_services[@]}"; do
