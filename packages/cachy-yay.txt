@@ -1,13 +1,12 @@
+accounts-qml-module
 ferrite-bin
-grub-hook
 hyprshade
 localsend-bin
-modprobed-db
-mpdris2
+nmgui-bin
 oh-my-posh-bin
 preload
 puddletag
 rsgain
 ryzen_smu-dkms-git
-nmgui-bin
+visual-studio-code-bin
 xcursor-simp1e
