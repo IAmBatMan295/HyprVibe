@@ -124,5 +124,5 @@ alias mrsgain='rsgain easy -m MAX -p no_album -S "$HOME/Music/music"'
 
 
 # Added by Antigravity CLI installer
-export PATH="/home/kunjan/.local/bin:$PATH"
-export PATH="/home/kunjan/.local/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
+
