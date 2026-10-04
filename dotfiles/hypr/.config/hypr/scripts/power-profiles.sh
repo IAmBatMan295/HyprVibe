@@ -40,11 +40,13 @@ run_cmd() {
     powerprofilesctl set power-saver
     notify-send -t 3000 "Power Profile" "Set to 󰤄 Power Saver Mode"
     
-    STATE=$(hyprctl getoption misc:vrr -j | grep '"int": 0')
+    STATE=$(hyprctl getoption misc.vrr -j | grep '"int": 0')
     if [ -z "$STATE" ]; then
-        hyprctl keyword monitor "eDP-1,2880x1800@60,auto,1.8"
-        hyprctl keyword misc:vrr 0
-        notify-send -t 4000 "Power Saver Active" "Refresh rate locked to 60Hz"
+        if hyprctl eval 'hl.monitor({ output = "eDP-1", mode = "2880x1800@60", position = "auto", scale = 1.8 })' > /dev/null 2>&1 && hyprctl eval 'hl.config({ misc = { vrr = 0 } })' > /dev/null 2>&1; then
+            notify-send -t 4000 "Power Saver Active" "Refresh rate locked to 60Hz"
+        else
+            notify-send -u critical "Power Saver Active" "Failed to lock refresh rate to 60Hz"
+        fi
     fi
     ;;
   esac

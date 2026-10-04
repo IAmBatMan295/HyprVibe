@@ -24,7 +24,7 @@ run_cmd() {
     systemctl reboot
     ;;
   --logout)
-    hyprctl dispatch exit
+    hyprctl dispatch 'hl.dsp.exit()'
     ;;
   --lock)
     sleep 0.2
