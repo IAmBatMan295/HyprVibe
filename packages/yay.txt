@@ -1,5 +1,4 @@
 accounts-qml-module
-ferrite-bin
 hyprshade
 localsend-bin
 nmgui-bin

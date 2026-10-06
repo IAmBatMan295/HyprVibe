@@ -45,8 +45,8 @@ detect_package_profile() {
 }
 
 set_package_files() {
-    PACMAN_LIST="${PACKAGES_DIR}/cachy-pacman.txt"
-    YAY_LIST="${PACKAGES_DIR}/cachy-yay.txt"
+    PACMAN_LIST="${PACKAGES_DIR}/pacman.txt"
+    YAY_LIST="${PACKAGES_DIR}/yay.txt"
 }
 
 trim() {
