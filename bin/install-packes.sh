@@ -41,53 +41,12 @@ run_with_tty_stdin() {
 }
 
 detect_package_profile() {
-    local requested_profile="${HYPRVIBE_PACKAGE_PROFILE:-}"
-
-    if [[ -n "$requested_profile" ]]; then
-        case "${requested_profile,,}" in
-            cachy|arch)
-                PACKAGE_PROFILE="${requested_profile,,}"
-                return 0
-                ;;
-            *)
-                log_error "HYPRVIBE_PACKAGE_PROFILE must be either 'cachy' or 'arch'."
-                return 1
-                ;;
-        esac
-    fi
-
-    local os_id=""
-    if [[ -r /etc/os-release ]]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release
-        os_id="${ID:-}"
-    fi
-
-    case "${os_id,,}" in
-        cachyos)
-            PACKAGE_PROFILE="cachy"
-            ;;
-        *)
-            PACKAGE_PROFILE="arch"
-            ;;
-    esac
+    PACKAGE_PROFILE="cachy"
 }
 
 set_package_files() {
-    case "$PACKAGE_PROFILE" in
-        cachy)
-            PACMAN_LIST="${PACKAGES_DIR}/cachy-pacman.txt"
-            YAY_LIST="${PACKAGES_DIR}/cachy-yay.txt"
-            ;;
-        arch)
-            PACMAN_LIST="${PACKAGES_DIR}/arch-pacman.txt"
-            YAY_LIST="${PACKAGES_DIR}/arch-yay.txt"
-            ;;
-        *)
-            log_error "Unsupported package profile: $PACKAGE_PROFILE"
-            return 1
-            ;;
-    esac
+    PACMAN_LIST="${PACKAGES_DIR}/cachy-pacman.txt"
+    YAY_LIST="${PACKAGES_DIR}/cachy-yay.txt"
 }
 
 trim() {
@@ -290,42 +249,19 @@ bootstrap_yay_verify() {
 }
 
 setup_reflector_once() {
-    if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
-        if ! command -v cachyos-rate-mirrors >/dev/null 2>&1; then
-            log_info "cachyos-rate-mirrors not found. Installing it first"
-            run_with_tty_stdin sudo pacman -S --needed cachyos-rate-mirrors || return 1
-        fi
-
-        log_info "Running cachyos-rate-mirrors for CachyOS mirrorlists"
-        sudo cachyos-rate-mirrors
-        log_success "cachyos-rate-mirrors completed"
-        return 0
+    if ! command -v cachyos-rate-mirrors >/dev/null 2>&1; then
+        log_info "cachyos-rate-mirrors not found. Installing it first"
+        run_with_tty_stdin sudo pacman -S --needed cachyos-rate-mirrors || return 1
     fi
 
-    if ! command -v reflector >/dev/null 2>&1; then
-        log_info "reflector not found. Installing reflector first"
-        run_with_tty_stdin sudo pacman -S --needed reflector || return 1
-    fi
-
-    run_reflector_for_target "/etc/pacman.d/mirrorlist" || return 1
-}
-
-run_reflector_for_target() {
-    local target_file="$1"
-
-    log_info "Running reflector to refresh ${target_file}"
-    log_info "Command: sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save ${target_file}"
-    sudo reflector --country India,Singapore,Taiwan,Japan --age 12 --protocol https --sort rate --latest 20 --save "$target_file"
-    log_success "reflector completed"
+    log_info "Running cachyos-rate-mirrors for CachyOS mirrorlists"
+    sudo cachyos-rate-mirrors
+    log_success "cachyos-rate-mirrors completed"
+    return 0
 }
 
 verify_reflector_setup() {
-    if [[ "$PACKAGE_PROFILE" == "cachy" ]]; then
-        command -v cachyos-rate-mirrors >/dev/null 2>&1
-        return
-    fi
-
-    command -v reflector >/dev/null 2>&1
+    command -v cachyos-rate-mirrors >/dev/null 2>&1
 }
 
 PACMAN_PKGS=()

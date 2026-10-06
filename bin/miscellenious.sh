@@ -59,7 +59,7 @@ enable_service_if_present() {
             return 0
         fi
 
-        sudo systemctl enable --now "$service"
+        sudo systemctl enable "$service"
         return 0
     fi
 
@@ -68,7 +68,7 @@ enable_service_if_present() {
         return 0
     fi
 
-    systemctl --user enable --now "$service"
+    systemctl --user enable "$service"
 }
 
 prepare_mpd_environment() {
@@ -100,7 +100,7 @@ enable_services() {
     )
 
     log_phase "Service Enablement"
-    log_info "Enabling global services with --now"
+    log_info "Enabling global services"
     local service
     for service in "${global_services[@]}"; do
         enable_service_if_present "system" "$service"
@@ -119,7 +119,7 @@ enable_services() {
         log_warn "ufw not found, skipping firewall rules"
     fi
 
-    log_info "Enabling user services with --now"
+    log_info "Enabling user services"
     prepare_mpd_environment
     for service in "${user_services[@]}"; do
         enable_service_if_present "user" "$service"
