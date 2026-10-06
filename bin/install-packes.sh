@@ -34,7 +34,7 @@ YAY_INSTALL_FLAGS=(
 
 run_with_tty_stdin() {
     if [[ -r /dev/tty ]]; then
-        "$@" </dev/tty
+        "$@" </dev/tty >/dev/tty 2>&1
     else
         "$@"
     fi
