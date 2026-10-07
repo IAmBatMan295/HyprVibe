@@ -162,10 +162,50 @@ verify_yamis_install() {
     yamis_installed
 }
 
+install_qylock_sddm_once() {
+    if [[ -d "/usr/share/sddm/themes/clockwork" ]]; then
+        log_success "Qylock (clockwork) SDDM theme is already installed."
+        return 0
+    fi
+
+    local tmp_dir
+    tmp_dir="$(mktemp -d)" || return 1
+
+    log_info "Cloning Qylock from GitHub..."
+    if ! git clone --depth 1 "https://github.com/Darkkal44/qylock.git" "${tmp_dir}/qylock" >/dev/null 2>&1; then
+        log_error "Failed to clone Qylock."
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    if [[ ! -d "${tmp_dir}/qylock/themes/clockwork" ]]; then
+        log_error "Clockwork theme not found in cloned Qylock repository."
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    log_info "Installing clockwork theme to /usr/share/sddm/themes/"
+    sudo mkdir -p /usr/share/sddm/themes/
+    sudo cp -a "${tmp_dir}/qylock/themes/clockwork" "/usr/share/sddm/themes/"
+
+    log_info "Setting clockwork as the active SDDM theme..."
+    sudo mkdir -p /etc/sddm.conf.d
+    echo -e "[Theme]\nCurrent=clockwork" | sudo tee /etc/sddm.conf.d/clockwork.conf > /dev/null
+
+    rm -rf "$tmp_dir"
+    log_success "Qylock SDDM theme applied."
+    return 0
+}
+
+verify_qylock_sddm() {
+    [[ -d "/usr/share/sddm/themes/clockwork" ]]
+}
+
 main() {
     setup_colors
 
     run_with_retries "Install YAMIS icon theme" install_yamis_once verify_yamis_install || exit 1
+    run_with_retries "Install Qylock SDDM theme" install_qylock_sddm_once verify_qylock_sddm || exit 1
     log_phase "Theme Assets Summary"
     log_success "Theme assets installation completed successfully."
 }
