@@ -163,8 +163,8 @@ verify_yamis_install() {
 }
 
 install_qylock_sddm_once() {
-    if [[ -d "/usr/share/sddm/themes/clockwork" ]]; then
-        log_success "Qylock (clockwork) SDDM theme is already installed."
+    if [[ -d "/usr/share/sddm/themes/orbital" ]]; then
+        log_success "Qylock (orbital) SDDM theme is already installed."
         return 0
     fi
 
@@ -178,19 +178,19 @@ install_qylock_sddm_once() {
         return 1
     fi
 
-    if [[ ! -d "${tmp_dir}/qylock/themes/clockwork" ]]; then
-        log_error "Clockwork theme not found in cloned Qylock repository."
+    if [[ ! -d "${tmp_dir}/qylock/themes/clockwork/orbital" ]]; then
+        log_error "Orbital theme not found in cloned Qylock repository."
         rm -rf "$tmp_dir"
         return 1
     fi
 
-    log_info "Installing clockwork theme to /usr/share/sddm/themes/"
+    log_info "Installing orbital theme to /usr/share/sddm/themes/"
     sudo mkdir -p /usr/share/sddm/themes/
-    sudo cp -a "${tmp_dir}/qylock/themes/clockwork" "/usr/share/sddm/themes/"
+    sudo cp -a "${tmp_dir}/qylock/themes/clockwork/orbital" "/usr/share/sddm/themes/"
 
-    log_info "Setting clockwork as the active SDDM theme..."
+    log_info "Setting orbital as the active SDDM theme..."
     sudo mkdir -p /etc/sddm.conf.d
-    echo -e "[Theme]\nCurrent=clockwork" | sudo tee /etc/sddm.conf.d/clockwork.conf > /dev/null
+    echo -e "[Theme]\nCurrent=orbital" | sudo tee /etc/sddm.conf.d/clockwork.conf > /dev/null
 
     rm -rf "$tmp_dir"
     log_success "Qylock SDDM theme applied."
@@ -198,7 +198,7 @@ install_qylock_sddm_once() {
 }
 
 verify_qylock_sddm() {
-    [[ -d "/usr/share/sddm/themes/clockwork" ]]
+    [[ -d "/usr/share/sddm/themes/orbital" ]]
 }
 
 main() {

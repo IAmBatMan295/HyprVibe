@@ -153,7 +153,7 @@ refresh_hyprvibe_clone() {
 
     log_phase "Bootstrap Repository"
     log_info "Cloning fresh HyprVibe copy from ${HYPRVIBE_REPO_URL}"
-    if ! git clone --depth 1 "$HYPRVIBE_REPO_URL" "$cloned_repo_dir"; then
+    if ! git clone "$HYPRVIBE_REPO_URL" "$cloned_repo_dir"; then
         cleanup_clone_temp
         log_error "Failed to clone ${HYPRVIBE_REPO_URL}"
         exit 1

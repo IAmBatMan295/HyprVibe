@@ -206,6 +206,18 @@ setup_grub_theme() {
         echo "GRUB_THEME='${theme_txt_path}'" | sudo tee -a /etc/default/grub >/dev/null
     fi
 
+    log_info "Forcing graphical terminal and copying fonts..."
+    sudo mkdir -p /boot/grub/fonts
+    sudo cp -a "${grub_local_dir}/"*.pf2 /boot/grub/fonts/ 2>/dev/null || true
+    
+    # Force GRUB_TERMINAL_OUTPUT=gfxterm to prevent text fallback
+    if grep -q "^GRUB_TERMINAL_OUTPUT=" /etc/default/grub; then
+        sudo sed -i -E "s|^GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|g" /etc/default/grub
+    else
+        # Also check if it's commented out and replace it
+        sudo sed -i -E "s|^#?GRUB_TERMINAL_OUTPUT=.*|GRUB_TERMINAL_OUTPUT=gfxterm|g" /etc/default/grub
+    fi
+
     log_info "Enabling GRUB OS Prober for dual boot..."
     sudo sed -i -E 's|^#?GRUB_DISABLE_OS_PROBER=.*|GRUB_DISABLE_OS_PROBER=false|' /etc/default/grub
 
