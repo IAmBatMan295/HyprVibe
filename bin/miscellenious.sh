@@ -187,13 +187,13 @@ setup_grub_theme() {
     log_phase "GRUB Theme Setup"
 
     local grub_local_dir="${SCRIPT_DIR}/../grub-theme/CRT-Amber-GRUB-Theme"
-    local sys_grub_dir="/usr/share/grub/themes/CRT-Amber-GRUB-Theme"
+    local sys_grub_dir="/boot/grub/themes/CRT-Amber-GRUB-Theme"
     local theme_txt_path="${sys_grub_dir}/theme.txt"
 
     if [[ -d "$grub_local_dir" ]]; then
         log_info "Installing GRUB 'CRT-Amber' theme from repository"
-        sudo mkdir -p "/usr/share/grub/themes/"
-        sudo cp -a "$grub_local_dir" "/usr/share/grub/themes/"
+        sudo mkdir -p "/boot/grub/themes/"
+        sudo cp -a "$grub_local_dir" "/boot/grub/themes/"
     else
         log_warn "GRUB theme not found in $grub_local_dir. Assuming already installed."
     fi
