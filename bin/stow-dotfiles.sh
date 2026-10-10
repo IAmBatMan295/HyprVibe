@@ -37,6 +37,7 @@ PACKAGES=(
     shell-config
     tmux
     waybar
+    xfce4
 )
 
 require_command() {
@@ -103,12 +104,20 @@ preclean_package_targets() {
         done < <(find "${pkg_dir}/.config" -mindepth 1 -maxdepth 1 -print0)
     fi
 
+    if [[ -d "${pkg_dir}/.local/share" ]]; then
+        local share_entry
+        while IFS= read -r -d '' share_entry; do
+            remove_target_if_exists "${USER_HOME}/.local/share/$(basename "$share_entry")" || return 1
+        done < <(find "${pkg_dir}/.local/share" -mindepth 1 -maxdepth 1 -print0)
+    fi
+
     local top_entry
     while IFS= read -r -d '' top_entry; do
-        if [[ "$(basename "$top_entry")" == ".config" ]]; then
+        local bname="$(basename "$top_entry")"
+        if [[ "$bname" == ".config" || "$bname" == ".local" ]]; then
             continue
         fi
-        remove_target_if_exists "${USER_HOME}/$(basename "$top_entry")" || return 1
+        remove_target_if_exists "${USER_HOME}/${bname}" || return 1
     done < <(find "$pkg_dir" -mindepth 1 -maxdepth 1 -name ".*" -print0)
 
     return 0

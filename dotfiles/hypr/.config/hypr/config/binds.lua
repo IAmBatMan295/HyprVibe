@@ -73,3 +73,6 @@ hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true 
 -- Switches
 hl.bind("switch:on:Lid Switch", hl.dsp.exec_cmd("sleep 0.5 && hyprctl dispatch 'hl.dsp.dpms(\"off\")'"), { locked = true })
 hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("hyprctl dispatch 'hl.dsp.dpms(\"on\")'"), { locked = true })
+
+-- Package list updater
+hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("foot -e $HOME/HyprVibe/bin/helpers/update-package-list.sh"))

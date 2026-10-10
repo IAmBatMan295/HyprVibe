@@ -267,6 +267,33 @@ configure_gsettings() {
     log_success "GSettings done"
 }
 
+install_madsnake() {
+    log_phase "Install madsnake screensaver"
+
+    local madsnake_dir="$HOME/madsnake"
+    if [[ ! -d "$madsnake_dir" ]]; then
+        log_info "Cloning madsnake repo to $madsnake_dir"
+        if ! git clone https://github.com/IAmBatMan295/madsnake.git "$madsnake_dir"; then
+            log_error "Failed to clone madsnake repository"
+            return 1
+        fi
+    else
+        log_info "madsnake repo already exists at $madsnake_dir, pulling latest"
+        if ! git -C "$madsnake_dir" pull; then
+            log_error "Failed to update madsnake repository"
+            return 1
+        fi
+    fi
+
+    log_info "Running madsnake install.sh"
+    if ! (cd "$madsnake_dir" && bash install.sh); then
+        log_error "madsnake install.sh failed"
+        return 1
+    fi
+
+    log_success "madsnake install complete"
+}
+
 main() {
     setup_colors
 
@@ -280,6 +307,7 @@ main() {
     setup_grub_theme
     configure_flatpak_themes
     configure_gsettings
+    install_madsnake
     enable_services
 }
 

@@ -507,6 +507,7 @@ sysbench
 sysfsutils
 texinfo
 threadweaver
+thunar
 tmux
 tree-sitter
 tree-sitter-c
@@ -585,10 +586,9 @@ xorg-xset
 xorg-xwayland
 xsel
 yay
+yazi
+zed
 zip
 zoxide
 zsh
 zziplib
-qt6-declarative
-qt6-5compat
-qt6-svg
