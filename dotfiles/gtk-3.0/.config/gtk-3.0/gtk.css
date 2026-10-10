@@ -23,3 +23,8 @@ button:active {
 .nemo-window * {
     font-family: "JetBrainsMono Nerd Font";
 }
+
+/* Force sharp corners globally */
+* {
+    border-radius: 0px !important;
+}
