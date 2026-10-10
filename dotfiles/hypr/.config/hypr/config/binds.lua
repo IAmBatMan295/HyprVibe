@@ -76,3 +76,22 @@ hl.bind("switch:off:Lid Switch", hl.dsp.exec_cmd("hyprctl dispatch 'hl.dsp.dpms(
 
 -- Package list updater
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd("foot -e $HOME/HyprVibe/bin/helpers/update-package-list.sh"))
+
+-- Resize submap
+hl.bind(mainMod .. " + Y", hl.dsp.submap("resize"))
+hl.define_submap("resize", function()
+	hl.bind("H", hl.dsp.window.resize({ x = -10, y = 0, relative = true }), { repeating = true })
+	hl.bind("J", hl.dsp.window.resize({ x = 0, y = 10, relative = true }), { repeating = true })
+	hl.bind("K", hl.dsp.window.resize({ x = 0, y = -10, relative = true }), { repeating = true })
+	hl.bind("L", hl.dsp.window.resize({ x = 10, y = 0, relative = true }), { repeating = true })
+	hl.bind("escape", hl.dsp.submap("reset"))
+end)
+
+-- Submap notifications
+hl.on("keybinds.submap", function(name)
+	if name == "resize" then
+		hl.exec_cmd("notify-send -t 2000 'Resize Mode ON'")
+	elseif name == "" then
+		hl.exec_cmd("notify-send -t 2000 'Resize Mode OFF'")
+	end
+end)
