@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 1. Get History
-HISTORY_SNAPSHOT=$(cliphist list)
+HISTORY_SNAPSHOT=$(cliphist list | head -n 20)
 
 # 2. Options
 CLEAR_OPTION="  Clear History"
