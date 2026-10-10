@@ -59,7 +59,7 @@ enable_service_if_present() {
             return 0
         fi
 
-        sudo systemctl enable "$service"
+        sudo systemctl enable "$service" || log_warn "Failed to enable $service (chroot?)"
         return 0
     fi
 
@@ -68,7 +68,7 @@ enable_service_if_present() {
         return 0
     fi
 
-    systemctl --user enable "$service"
+    systemctl --user enable "$service" || log_warn "Failed to enable user service $service (chroot?)"
 }
 
 prepare_mpd_environment() {
@@ -109,7 +109,7 @@ enable_services() {
     log_info "Disabling Wi-Fi power save"
     sudo mkdir -p /etc/NetworkManager/conf.d
     echo -e "[connection]\nwifi.powersave = 2" | sudo tee /etc/NetworkManager/conf.d/99-disable-wifi-powersave.conf > /dev/null
-    sudo systemctl restart NetworkManager
+    sudo systemctl restart NetworkManager || log_warn "Could not restart NetworkManager (expected in chroot)"
 
     log_info "Configuring UFW rules"
     if command -v ufw >/dev/null 2>&1; then
