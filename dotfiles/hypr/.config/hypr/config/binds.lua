@@ -1,5 +1,5 @@
 local terminal = "foot"
-local fileManager = "nemo"
+local fileManager = "thunar"
 local menu = "rofi -show drun"
 local mainMod = "SUPER"
 

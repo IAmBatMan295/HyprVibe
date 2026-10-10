@@ -337,8 +337,6 @@ mujs
 mypaint-brushes1
 nano
 nano-syntax-highlighting
-nemo
-nemo-fileroller
 neovim
 netctl
 network-manager-applet

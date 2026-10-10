@@ -141,6 +141,13 @@ main() {
     done
 
     log_phase "Stow Apply"
+    log_info "Processing file templates..."
+    if [[ -f "${ROOT_DIR}/templates/xfce4/thunar.xml.template" ]]; then
+        local target_thunar="${USER_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml"
+        mkdir -p "$(dirname "$target_thunar")"
+        sed "s|_USER_HOME_|${USER_HOME}|g" "${ROOT_DIR}/templates/xfce4/thunar.xml.template" > "$target_thunar"
+    fi
+
     log_info "Stowing dotfiles packages into ${USER_HOME}"
     cd "$DOTFILES_DIR"
     stow -t "$USER_HOME" "${PACKAGES[@]}"

@@ -20,7 +20,7 @@ mkdir -p "${USER_HOME}/Pictures/Screenshots" "${USER_HOME}/Pictures/Recordings"
 MPV_DIR="${USER_HOME}/.config/mpv"
 SCRIPTS_DIR="${MPV_DIR}/scripts"
 SCRIPT_OPTS_DIR="${MPV_DIR}/script-opts"
-UOSC_KEY="b0rd16N0bp7DETMpO4pYZwIqmQkZbYQr"
+UOSC_KEY="YOUR_API_KEY_HERE"
 TMP_DIR="$(mktemp -d)"
 
 cleanup() {
