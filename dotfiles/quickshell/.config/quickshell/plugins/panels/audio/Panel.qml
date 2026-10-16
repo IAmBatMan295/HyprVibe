@@ -631,6 +631,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
+    fontSize: 16
     text: root.outputIcon()
     tooltipText: root.allMuted ? "Audio: Muted" : ("Playing at " + Math.round(root.outputVolume * 100) + "%")
     onPressed: function(b) {

@@ -652,6 +652,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
+    fontSize: 16
     text: root.icon
     tooltipText: root.adapter && !root.adapter.enabled
       ? "Bluetooth: Disabled"

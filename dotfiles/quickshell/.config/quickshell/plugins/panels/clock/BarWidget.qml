@@ -159,7 +159,6 @@ BarWidget {
     fixedHeight: root.vertical ? root.verticalLines.length * Style.bar.iconSlot : -1
     horizontalMargin: 8
     verticalPadding: 4
-    tooltipText: Qt.formatDateTime(root.displayDate, "dddd, d MMMM yyyy")
 
     onPressed: function(b) {
       if (b === Qt.RightButton) root.cycleFormat()

@@ -957,6 +957,7 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
+    fontSize: 16
     text: root.icon
     tooltipText: root.kind === "wifi"
       ? ((root.connectedWifiNetwork ? root.connectedWifiNetwork.name : "Wi-Fi") + (root.signalStrength >= 0 ? " (" + root.signalStrength + "%)" : ""))

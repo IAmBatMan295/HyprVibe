@@ -66,7 +66,6 @@ BarWidget {
 
         bar: root.bar
         text: modelData === 10 ? "0" : String(modelData)
-        tooltipText: "Workspace " + modelData
         fontBold: focused
         foreground: focused ? (root.bar ? root.bar.foreground : ThemeColor.foreground) : ThemeColor.muted
         opacity: focused ? 1.0 : (occupied ? 0.8 : 0.5)

@@ -1757,33 +1757,6 @@ Item {
       }
     }
 
-    Rectangle {
-      id: openPanelIndicator
-
-      readonly property int inset: Style.space(2)
-
-      visible: opacity > 0
-      opacity: slot.panelOpen && !slot.dragSource ? 0.9 : 0
-      color: ThemeColor.accent
-      radius: Math.min(width, height) / 2
-      width: root.vertical ? Style.space(2) : slot.panelIndicatorExtent
-      height: root.vertical ? slot.panelIndicatorExtent : Style.space(2)
-      // The mark sits on the module's inner edge — the one facing the
-      // desktop — so it underlines a top bar, overlines a bottom one, and
-      // points inward from a left or right one. It reads as pointing at the
-      // panel that opens on that side.
-      x: root.vertical
-        ? (root.position === "left" ? parent.width - width - inset : inset)
-        : Math.round((parent.width - width) / 2)
-      y: root.vertical
-        ? Math.round((parent.height - height) / 2)
-        : (root.position === "top" ? parent.height - height - inset : inset)
-      z: 50
-
-      Behavior on opacity {
-        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-      }
-    }
 
     MouseArea {
       id: modulePointer
