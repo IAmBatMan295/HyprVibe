@@ -1,94 +1,119 @@
 #!/usr/bin/env bash
 
 # ---- CONFIG ----
-WALL_DIR="$HOME/Pictures/Wallpapers"
+WALL_DIR="${WALL_DIR:-$HOME/Pictures/Wallpapers}"
 INTERVAL=45
 MODE="fill" # fill | fit | stretch | center | tile
+STATE_FILE="$HOME/.local/state/hyprvibe/current_wallpaper"
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/hyprvibe-wallpaper-changer.lock"
 
 if ! command -v swaybg >/dev/null 2>&1; then
   exit 0
 fi
 
+# Ensure single running instance
+exec 200>"$LOCK_FILE"
+if ! flock -n 200; then
+  exit 0
+fi
+
+mkdir -p "$(dirname "$STATE_FILE")"
+
 CURRENT_PID=""
 SLEEP_PID=""
 LAST_WALL=""
-FORCE_RELOAD=0
+DECK=()
 
-# ---- PICK RANDOM WALLPAPER (NO CONSECUTIVE DUPLICATES) ----
-pick_wallpaper() {
-  local wall_count="$1"
-  local chosen=""
-  if [ "$wall_count" -gt 1 ] && [ -n "$LAST_WALL" ]; then
-    chosen="$(find "$WALL_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) ! -name "$(basename "$LAST_WALL")" 2>/dev/null | shuf -n 1)"
+# Detect currently displayed wallpaper on startup
+if [[ -f "$STATE_FILE" ]]; then
+  LAST_WALL="$(cat "$STATE_FILE" 2>/dev/null)"
+fi
+if [[ -z "$LAST_WALL" ]]; then
+  LAST_WALL="$(pgrep -a swaybg 2>/dev/null | grep -oP '(?<=-i )\S+' | head -n 1)"
+fi
+
+# Adopt running swaybg PID to prevent orphaned processes
+CURRENT_PID="$(pgrep -o swaybg 2>/dev/null || true)"
+
+refill_deck() {
+  readarray -d '' -t DECK < <(find "$WALL_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) -print0 2>/dev/null | shuf -z)
+
+  local count=${#DECK[@]}
+  if (( count == 0 )); then
+    return
   fi
-  if [ -z "$chosen" ]; then
-    chosen="$(find "$WALL_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) 2>/dev/null | shuf -n 1)"
+
+  # Prevent repeating the last wallpaper across cycle boundaries
+  if (( count > 1 )) && [[ -n "$LAST_WALL" && "${DECK[0]}" == "$LAST_WALL" ]]; then
+    local swap_idx=$(( (RANDOM % (count - 1)) + 1 ))
+    local tmp="${DECK[0]}"
+    DECK[0]="${DECK[swap_idx]}"
+    DECK[swap_idx]="$tmp"
   fi
-  echo "$chosen"
 }
 
 change_wallpaper() {
-  if [ ! -d "$WALL_DIR" ]; then
+  if [[ ! -d "$WALL_DIR" ]]; then
     return
   fi
 
-  local wall_count
-  wall_count="$(find "$WALL_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) 2>/dev/null | wc -l)"
+  # Refill and shuffle deck when empty
+  if (( ${#DECK[@]} == 0 )); then
+    refill_deck
+  fi
 
-  # Zero wallpapers — nothing to show
-  if [ "$wall_count" -eq 0 ]; then
+  local count=${#DECK[@]}
+  if (( count == 0 )); then
     return
   fi
 
-  if [ "$wall_count" -le 1 ] && [ -n "$CURRENT_PID" ] && [ "$FORCE_RELOAD" -ne 1 ]; then
-    # Only one wallpaper and already displaying it — just wait
+  # If only 1 wallpaper and already showing it, avoid re-rendering
+  if (( count == 1 )) && [[ "${DECK[0]}" == "$LAST_WALL" ]] && [[ -n "$CURRENT_PID" ]] && kill -0 "$CURRENT_PID" 2>/dev/null; then
     return
   fi
 
-  local wall
-  wall="$(pick_wallpaper "$wall_count")"
-  if [ -z "$wall" ]; then
-    return
-  fi
+  local wall="${DECK[0]}"
+  DECK=("${DECK[@]:1}")
 
-  # Start new swaybg first
-  swaybg -i "$wall" -m "$MODE" &
+  # Spawn new swaybg first (close fd 200 so children don't inherit lock)
+  swaybg -i "$wall" -m "$MODE" 200>&- >/dev/null 2>&1 &
   local new_pid=$!
 
-  # Allow swaybg to map before killing the old one
-  sleep 0.3
+  # Allow Wayland compositor to map surface before terminating old instance
+  sleep 0.5
 
-  # Kill previous swaybg instance (prevents leaks)
-  if [ -n "$CURRENT_PID" ]; then
+  # Kill previous swaybg instance
+  if [[ -n "$CURRENT_PID" && "$CURRENT_PID" != "$new_pid" ]]; then
     kill "$CURRENT_PID" 2>/dev/null || true
   fi
 
   CURRENT_PID="$new_pid"
   LAST_WALL="$wall"
-  FORCE_RELOAD=0
+  echo "$wall" > "$STATE_FILE" 2>/dev/null || true
 }
 
 on_usr1() {
-  # Terminate current sleep so interval resets immediately
-  FORCE_RELOAD=1
-  if [ -n "$SLEEP_PID" ]; then
+  # Terminate current sleep so interval resets immediately, flush deck to re-read wall dir
+  DECK=()
+  if [[ -n "$SLEEP_PID" ]]; then
     kill "$SLEEP_PID" 2>/dev/null || true
   fi
 }
 
 cleanup() {
-  if [ -n "$CURRENT_PID" ]; then
+  if [[ -n "$CURRENT_PID" ]]; then
     kill "$CURRENT_PID" 2>/dev/null || true
   fi
   exit 0
 }
 
 trap 'cleanup' SIGINT SIGTERM
+trap '' SIGHUP
 trap 'on_usr1' SIGUSR1
 
 while true; do
   change_wallpaper
-  sleep "$INTERVAL" &
+  sleep "$INTERVAL" 200>&- &
   SLEEP_PID=$!
   wait "$SLEEP_PID" 2>/dev/null || true
   SLEEP_PID=""

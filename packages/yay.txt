@@ -2,7 +2,6 @@ accounts-qml-module
 hyprshade
 localsend-bin
 lutgen-bin
-nmgui-bin
 oh-my-posh-bin
 preload
 puddletag

@@ -22,7 +22,6 @@ base-devel
 bash-completion
 bind
 blas
-bluetui
 bluez
 bluez-hid2hci
 bluez-libs
@@ -554,7 +553,6 @@ vulkan-nouveau
 vulkan-radeon
 vulkan-tools
 wavpack
-waybar
 webkit2gtk-4.1
 wf-recorder
 wget
