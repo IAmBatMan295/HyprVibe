@@ -1,0 +1,7 @@
+hl.env("XCURSOR_SIZE", "22")
+hl.env("HYPRCURSOR_SIZE", "22")
+hl.env("XCURSOR_THEME", "Simp1e")
+hl.env("HYPRCURSOR_THEME", "Simp1e")
+hl.env("TERMINAL", "foot")
+hl.env("CLIPHIST_MAX_ITEMS", "20")
+hl.env("CLIPHIST_MAX_ITEM_SIZE", "10485760")

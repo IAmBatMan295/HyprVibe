@@ -1,0 +1,17 @@
+* {
+    primary: #FFFFFFFF;
+    on-primary: #000000d9;
+    primary-container: #FFFFFFFF;
+    on-primary-container: #FFFFFFFF;
+    on-surface: #FFFFFFFF;
+    on-surface-variant: #555555FF;
+    outline: #FFFFFFFF;
+    outline-variant: #555555FF;
+    surface-container-high: #000000FF;
+    error: #FFFFFFFF;
+    error-container: #FFFFFFFF;
+    on-error-container: #000000FF;
+}
+
+/* Dynamic Theme Import (applied at bottom so theme takes precedence over fallbacks) */
+@import "~/.local/state/hyprvibe/current/rofi.rasi"

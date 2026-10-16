@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "hyprvibe.backlight",
+  "name": "Backlight",
+  "version": "1.0.0",
+  "author": "HyprVibe",
+  "description": "Brightness control and indicator",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Backlight.qml"
+  },
+  "barWidget": {
+    "displayName": "Backlight",
+    "description": "Brightness control and indicator",
+    "category": "Hardware",
+    "allowMultiple": false
+  }
+}

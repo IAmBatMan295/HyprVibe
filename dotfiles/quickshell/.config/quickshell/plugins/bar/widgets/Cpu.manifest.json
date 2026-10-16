@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "hyprvibe.cpu",
+  "name": "CPU",
+  "version": "1.0.0",
+  "author": "HyprVibe",
+  "description": "CPU frequency and usage indicator",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Cpu.qml"
+  },
+  "barWidget": {
+    "displayName": "CPU",
+    "description": "CPU frequency and usage indicator",
+    "category": "System",
+    "allowMultiple": false
+  }
+}

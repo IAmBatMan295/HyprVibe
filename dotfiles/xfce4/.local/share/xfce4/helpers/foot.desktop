@@ -1,0 +1,9 @@
+[Desktop Entry]
+NoDisplay=true
+Version=1.0
+Encoding=UTF-8
+Type=X-XFCE-Helper
+X-XFCE-Category=TerminalEmulator
+X-XFCE-CommandsWithParameter=foot -D %s
+X-XFCE-Commands=foot
+Name=foot

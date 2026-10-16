@@ -1,0 +1,27 @@
+sort=+time
+default-timeout=5000
+max-visible=5
+anchor=top-right
+margin=10
+padding=15
+width=350
+max-history=20
+format=<b>%s</b>\n%b
+border-size=2
+border-radius=0
+font=JetBrainsMono Nerd Font 11
+ignore-timeout=0
+layer=overlay
+
+# Dynamic Theme Import (global section before criteria)
+include=~/.local/state/hyprvibe/current/mako.conf
+
+[grouped]
+format=<b>%s</b>\n%b
+
+[urgency=critical]
+default-timeout=0
+ignore-timeout=1
+
+[urgency=low]
+default-timeout=3000

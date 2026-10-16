@@ -1,0 +1,14 @@
+/* Dynamic Theme Import */
+@import "../../.local/state/hyprvibe/current/gtk.css";
+
+/* Force sharp corners globally */
+* {
+    border-radius: 0px;
+}
+
+/* Kill double borders and shadows in tiling compositors */
+window.csd,
+window.csd decoration {
+    box-shadow: none;
+    border: none;
+}

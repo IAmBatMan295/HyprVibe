@@ -1,0 +1,42 @@
+/* Fallback Monochrome Colors */
+@define-color window_bg_color alpha(#000000, 1);
+@define-color window_fg_color #8e8e8e;
+@define-color view_bg_color alpha(#000000, 1);
+@define-color view_fg_color #8e8e8e;
+@define-color popover_bg_color alpha(#000000, 1);
+@define-color popover_fg_color #8e8e8e;
+@define-color accent_color #e0e0e0;
+@define-color accent_bg_color #e0e0e0;
+@define-color accent_fg_color #000000;
+@define-color headerbar_bg_color #000000;
+@define-color headerbar_fg_color #8e8e8e;
+
+button {
+    background-color: #1a1a1a;
+}
+button:checked,
+button:active {
+    background-color: #1a1a1a;
+    border: 2px solid #e0e0e0;
+}
+
+/* Dynamic Theme Import */
+@import "../../.local/state/hyprvibe/current/gtk.css";
+
+/* Nemo file manager font */
+.nemo-window * {
+    font-family: "JetBrainsMono Nerd Font";
+}
+
+/* Force sharp corners globally */
+* {
+    border-radius: 0px;
+}
+
+/* Kill double borders and shadows in tiling compositors */
+window.csd,
+window.csd decoration {
+    box-shadow: none;
+    border: none;
+}
+

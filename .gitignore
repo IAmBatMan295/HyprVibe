@@ -1,0 +1,6 @@
+.agents/
+dotfiles/gtk-3.0/.config/gtk-3.0/bookmarks
+self_tests/
+dotfiles/gtk-4.0/.config/gtk-4.0/assets
+dotfiles/xfce4/.config/Thunar/accels.scm
+scratch/

@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "bar": {
+    "position": "top",
+    "transparent": false,
+    "autohide": false,
+    "centerAnchor": "hyprvibe.clock",
+    "layout": {
+      "left": [
+        {
+          "id": "hyprvibe.media"
+        },
+        {
+          "id": "hyprvibe.workspaces"
+        }
+      ],
+      "center": [
+        {
+          "id": "hyprvibe.clock",
+          "format": "dddd  h:mm AP  d MMMM"
+        }
+      ],
+      "right": [
+        {
+          "id": "hyprvibe.cpu"
+        },
+        {
+          "id": "hyprvibe.memory"
+        },
+        {
+          "id": "hyprvibe.audio"
+        },
+        {
+          "id": "hyprvibe.bluetooth"
+        },
+        {
+          "id": "hyprvibe.network"
+        },
+        {
+          "id": "hyprvibe.backlight"
+        },
+        {
+          "id": "hyprvibe.power"
+        }
+      ]
+    }
+  },
+  "plugins": []
+}

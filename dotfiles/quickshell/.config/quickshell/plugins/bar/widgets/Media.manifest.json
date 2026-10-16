@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "hyprvibe.media",
+  "name": "Media Player",
+  "version": "1.0.0",
+  "author": "HyprVibe",
+  "description": "MPD playback controls matching Waybar",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Media.qml"
+  },
+  "barWidget": {
+    "displayName": "Media Player",
+    "description": "MPD playback controls matching Waybar",
+    "category": "Media",
+    "allowMultiple": false
+  }
+}

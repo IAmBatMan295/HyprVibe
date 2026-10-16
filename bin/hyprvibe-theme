@@ -1,0 +1,281 @@
+#!/usr/bin/env bash
+
+# HyprVibe Theme Dispatcher CLI
+# Manages active theme state and renders dynamic component configs
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+THEME_LIB="${SCRIPT_DIR}/lib/theme-engine.sh"
+
+if [[ ! -r "$THEME_LIB" ]]; then
+    echo "Error: Missing theme engine library: $THEME_LIB" >&2
+    exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$THEME_LIB"
+
+THEMES_DIR="${ROOT_DIR}/themes"
+USER_THEMES_DIR="${HOME}/.config/hyprvibe/themes"
+TEMPLATES_DIR="${ROOT_DIR}/templates/themed"
+STATE_DIR="${HOME}/.local/state/hyprvibe/current"
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/hyprvibe-theme.lock"
+
+usage() {
+    cat << EOF
+Usage: hyprvibe-theme <command> [arguments]
+
+Commands:
+  list                 List all available themes
+  current              Show currently active theme name
+  get <color_key>      Print resolved color value for active theme
+  set <theme_name>     Apply specified theme across all components
+  help                 Show this help message
+EOF
+}
+
+cmd_list() {
+    local -A seen=()
+    local dir tname
+
+    for dir in "$THEMES_DIR" "$USER_THEMES_DIR"; do
+        if [[ -d "$dir" ]]; then
+            for theme_path in "$dir"/*; do
+                if [[ -d "$theme_path" && -f "$theme_path/colors.toml" ]]; then
+                    tname="$(basename "$theme_path")"
+                    if [[ -z "${seen[$tname]:-}" ]]; then
+                        echo "$tname"
+                        seen["$tname"]=1
+                    fi
+                fi
+            done
+        fi
+    done
+}
+
+cmd_current() {
+    if [[ -f "${STATE_DIR}/theme.name" ]]; then
+        cat "${STATE_DIR}/theme.name"
+    else
+        echo "monochrome"
+    fi
+}
+
+cmd_get() {
+    local key="${1:-}"
+    if [[ -z "$key" ]]; then
+        echo "Error: Key required. Usage: hyprvibe-theme get <color_key>" >&2
+        return 1
+    fi
+
+    local current_colors="${STATE_DIR}/colors.toml"
+    if [[ ! -f "$current_colors" ]]; then
+        local current_theme
+        current_theme="$(cmd_current)"
+        current_colors="${THEMES_DIR}/${current_theme}/colors.toml"
+    fi
+
+    if [[ -f "$current_colors" ]]; then
+        load_colors_file "$current_colors"
+        get_theme_color "$key"
+    else
+        echo "Error: No active colors file found" >&2
+        return 1
+    fi
+}
+
+cmd_set() {
+    local theme_name="${1:-}"
+    if [[ -z "$theme_name" ]]; then
+        echo "Error: Theme name required. Usage: hyprvibe-theme set <theme_name>" >&2
+        return 1
+    fi
+
+    # Normalize theme name
+    theme_name="$(echo "$theme_name" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')"
+
+    local target_dir=""
+    if [[ -d "${USER_THEMES_DIR}/${theme_name}" && -f "${USER_THEMES_DIR}/${theme_name}/colors.toml" ]]; then
+        target_dir="${USER_THEMES_DIR}/${theme_name}"
+    elif [[ -d "${THEMES_DIR}/${theme_name}" && -f "${THEMES_DIR}/${theme_name}/colors.toml" ]]; then
+        target_dir="${THEMES_DIR}/${theme_name}"
+    else
+        echo "Error: Theme '$theme_name' does not exist." >&2
+        return 1
+    fi
+
+    # Acquire lock to prevent race conditions
+    exec 9>"$LOCK_FILE"
+    flock 9
+
+    mkdir -p "$STATE_DIR"
+
+    # Load palette
+    load_colors_file "${target_dir}/colors.toml"
+
+    # Render dynamic templates into STATE_DIR
+    render_all_templates "$TEMPLATES_DIR" "$STATE_DIR"
+
+    # Copy current colors.toml for reference
+    cp "${target_dir}/colors.toml" "${STATE_DIR}/colors.toml"
+
+    # Record active theme
+    echo "$theme_name" > "${STATE_DIR}/theme.name"
+    ln -sfn "$target_dir" "${STATE_DIR}/theme"
+
+    # Sync theme backgrounds to ~/Pictures/Wallpapers and signal wallpaper-changer.sh
+    local wall_dir="${USER_HOME:-$HOME}/Pictures/Wallpapers"
+    if [[ -d "${target_dir}/backgrounds" ]]; then
+        shopt -s nullglob
+        local bgs=("${target_dir}/backgrounds"/*.{jpg,jpeg,png,webp})
+        shopt -u nullglob
+        if (( ${#bgs[@]} > 0 )); then
+            mkdir -p "$wall_dir"
+            # Delete old wallpapers (files only) from Wallpapers directory
+            find "$wall_dir" -maxdepth 1 -type f -delete
+            # Copy new theme backgrounds
+            cp -a "${bgs[@]}" "$wall_dir/"
+            # Signal wallpaper-changer.sh or launch it if not running
+            local changer_script="${USER_HOME:-$HOME}/.config/hypr/scripts/wallpaper-changer.sh"
+            if pgrep -f wallpaper-changer.sh >/dev/null 2>&1; then
+                pkill -SIGUSR1 -f wallpaper-changer.sh 2>/dev/null || true
+            elif [[ -x "$changer_script" ]] && command -v swaybg >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
+                killall swaybg 2>/dev/null || true
+                "$changer_script" &
+            elif command -v swaybg >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
+                killall swaybg 2>/dev/null || true
+                swaybg -i "${bgs[0]}" -m fill &
+            fi
+        fi
+    fi
+
+    # GTK / GSettings retint (if desktop session active)
+    if command -v gsettings >/dev/null 2>&1 && [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
+        local mode
+        mode="$(get_theme_color "mode" "dark")"
+        if [[ "$mode" == "light" ]]; then
+            gsettings set org.gnome.desktop.interface color-scheme "prefer-light" 2>/dev/null || true
+            gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3" 2>/dev/null || true
+        else
+            gsettings set org.gnome.desktop.interface color-scheme "prefer-dark" 2>/dev/null || true
+            gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark" 2>/dev/null || true
+        fi
+
+        local icon_file="${target_dir}/icons.theme"
+        if [[ -f "$icon_file" && -s "$icon_file" ]]; then
+            local icon_theme
+            icon_theme="$(<"$icon_file")"
+            gsettings set org.gnome.desktop.interface icon-theme "$icon_theme" 2>/dev/null || true
+        fi
+    fi
+
+
+    # Reload desktop components in parallel
+    if command -v hyprctl >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
+        hyprctl reload >/dev/null 2>&1 &
+    fi
+
+
+    if command -v makoctl >/dev/null 2>&1 && pgrep -x mako >/dev/null 2>&1; then
+        makoctl reload >/dev/null 2>&1 &
+    fi
+
+    if pgrep -x kitty >/dev/null 2>&1; then
+        killall -SIGUSR1 kitty 2>/dev/null &
+    fi
+
+    if command -v tmux >/dev/null 2>&1 && pgrep -x tmux >/dev/null 2>&1; then
+        tmux source-file "${STATE_DIR}/tmux.conf" 2>/dev/null || true
+    fi
+
+    flock -u 9
+    echo "Theme '$theme_name' applied successfully."
+}
+
+format_theme_title() {
+    local name="$1"
+    local spaced="${name//[-_]/ }"
+    awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1' <<< "$spaced"
+}
+
+cmd_menu() {
+    local raw_themes
+    raw_themes="$(cmd_list)"
+    local current
+    current="$(cmd_current)"
+
+    local c_active c_dim
+    c_active="$(cmd_get foreground 2>/dev/null || echo '#ffffff')"
+    c_dim="$(cmd_get muted 2>/dev/null || echo '#8e8e8e')"
+
+    local display_themes=""
+    local line
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        local title
+        title="$(format_theme_title "$line")"
+        local row_color="$c_dim"
+        if [[ "$line" == "$current" ]]; then
+            row_color="$c_active"
+        fi
+        local row="<span color=\"${row_color}\">${title}</span>"
+        if [[ -z "$display_themes" ]]; then
+            display_themes="$row"
+        else
+            display_themes="${display_themes}"$'\n'"${row}"
+        fi
+    done <<< "$raw_themes"
+
+    local current_title
+    current_title="$(format_theme_title "$current")"
+
+    local rasi_file="${HOME}/.config/rofi/theme-switcher.rasi"
+    local selected=""
+    if [[ -f "$rasi_file" ]]; then
+        selected=$(echo "$display_themes" | rofi -dmenu -markup-rows -theme "$rasi_file" -select "$current_title" 2>/dev/null || true)
+    else
+        selected=$(echo "$display_themes" | rofi -dmenu -markup-rows -p "Theme" -select "$current_title" 2>/dev/null || true)
+    fi
+
+    # Strip any Pango markup tags from selection
+    selected=$(echo "$selected" | sed -E 's/<[^>]*>//g')
+
+    if [[ -n "$selected" ]]; then
+        cmd_set "$selected"
+    fi
+}
+
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        list)
+            cmd_list "$@"
+            ;;
+        current)
+            cmd_current "$@"
+            ;;
+        get)
+            cmd_get "$@"
+            ;;
+        set)
+            cmd_set "$@"
+            ;;
+        menu)
+            cmd_menu "$@"
+            ;;
+        help|--help|-h|"")
+            usage
+            ;;
+        *)
+            echo "Unknown command: $cmd" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"

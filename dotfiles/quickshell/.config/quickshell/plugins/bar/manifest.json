@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "hyprvibe.bar",
+  "name": "Bar",
+  "version": "1.0.0",
+  "author": "HyprVibe",
+  "description": "Status bar with widgets",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}

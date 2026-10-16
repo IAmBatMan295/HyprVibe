@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# HyprVibe btop wrapper
+# Dispatches btop with dynamically rendered HyprVibe theme directory
+
+THEME_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/hyprvibe/current"
+
+if [[ -d "$THEME_DIR" && -f "$THEME_DIR/btop.theme" ]]; then
+    exec /usr/bin/btop --themes-dir "$THEME_DIR" "$@"
+else
+    exec /usr/bin/btop "$@"
+fi
