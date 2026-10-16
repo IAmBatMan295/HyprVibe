@@ -38,7 +38,6 @@ hl.bind("SHIFT + F11", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scrip
 hl.bind(mainMod .. " + SHIFT + P", hl.dsp.exec_cmd("foot -e ~/.config/hypr/scripts/battery-mode.sh"))
 hl.bind(mainMod .. " + grave", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/clipboard-menu.sh"))
 hl.bind(mainMod .. " + P", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/power-profiles.sh"))
-hl.bind(mainMod .. " + CTRL + B", hl.dsp.exec_cmd("foot -e bluetui"))
 hl.bind(mainMod .. " + M", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/power-menu.sh"))
 hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }))
