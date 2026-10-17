@@ -31,7 +31,7 @@ rofi_cmd() {
     -p "Profile ($active)" \
     -markup-rows \
     -theme-str 'listview { lines: 3; }' \
-    -theme ~/.config/rofi/powermenu.rasi
+    -theme ~/.config/rofi/power-menu.rasi
 }
 
 run_rofi() {
