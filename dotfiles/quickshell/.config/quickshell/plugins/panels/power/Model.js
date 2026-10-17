@@ -65,16 +65,26 @@ function chargeThresholdActive(device, onBattery, states) {
 
 function batteryIcon(device, onBattery, states) {
   var d = device || {}
+  var s = states || {}
   if (!d.isPresent) return ""
 
-  // When on AC / plugged in, show plug icon matching Waybar
-  if (!onBattery) return ""
+  // When on AC / plugged in:
+  if (!onBattery) {
+    // Actively charging (not threshold and not full)
+    if (d.state === s.Charging && !chargeThresholdActive(d, onBattery, s) && Number(d.percentage || 0) < 0.99) {
+      return "󰂄"
+    }
+    // Plugged in but not charging (conservation / threshold / fully charged)
+    return ""
+  }
 
-  var horizontalIcons = ["", "", "", "", ""]
-  var index = Math.max(0, Math.min(4, Math.floor(d.percentage * 5)))
+  // Discharging (on battery) - vertical battery icons
+  var verticalIcons = ["󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+  var pct = Math.max(0, Math.min(1, Number(d.percentage || 0)))
+  var index = Math.max(0, Math.min(9, Math.floor(pct * 10)))
 
-  if (d.state === states.FullyCharged) return ""
-  return horizontalIcons[index]
+  if (d.state === s.FullyCharged || pct >= 0.99) return "󰁹"
+  return verticalIcons[index]
 }
 
 function modeLabel(device, onBattery, states) {

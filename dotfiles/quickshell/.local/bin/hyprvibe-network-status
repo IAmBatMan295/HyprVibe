@@ -11,8 +11,14 @@ case "${1:-}" in
   --verbose)
     verbose=true
     ;;
+  --scan|--rescan)
+    if cmd_present nmcli; then
+      nmcli dev wifi rescan 2>/dev/null || true
+    fi
+    exit 0
+    ;;
   *)
-    echo "Usage: hyprvibe-network-status [--verbose]" >&2
+    echo "Usage: hyprvibe-network-status [--verbose|--scan]" >&2
     exit 2
     ;;
 esac

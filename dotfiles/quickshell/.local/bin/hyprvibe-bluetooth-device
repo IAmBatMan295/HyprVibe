@@ -8,15 +8,17 @@
 set -e
 
 usage() {
-  echo "Usage: hyprvibe-bluetooth-device [pair|connect|disconnect|forget] <address>" >&2
+  echo "Usage: hyprvibe-bluetooth-device [scan|pair|connect|disconnect|forget] [address]" >&2
   exit 1
 }
 
 action=${1:-}
 address=${2:-}
 
-[[ $action == "pair" || $action == "connect" || $action == "disconnect" || $action == "forget" ]] || usage
-[[ $address =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]] || usage
+[[ $action == "scan" || $action == "pair" || $action == "connect" || $action == "disconnect" || $action == "forget" ]] || usage
+if [[ $action != "scan" ]]; then
+  [[ $address =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]] || usage
+fi
 
 power_on() {
   [[ $(timeout 2s bluetoothctl show 2>/dev/null) == *"Powered: yes"* ]] && return
@@ -30,6 +32,10 @@ trust_device() {
 }
 
 case "$action" in
+  scan)
+    power_on
+    timeout 5s bluetoothctl scan on >/dev/null 2>&1 || true
+    ;;
   pair)
     power_on
     timeout 20s bluetoothctl pair "$address" >/dev/null 2>&1 || true

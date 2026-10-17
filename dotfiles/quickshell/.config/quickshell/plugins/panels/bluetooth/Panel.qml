@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Bluetooth
@@ -97,10 +98,19 @@ Panel {
   // address across section changes instead of preserving a stale row index.
   property string focusedDeviceAddress: ""
 
-  // "header" is a virtual section for the hero Bluetooth on/off toggle; it
-  // sits above the device sections so the adapter can be toggled by keyboard
-  // even when it is off and no device rows exist.
-  readonly property bool headerHasCursor: cursorActive && focusSection === "header"
+  // "header" is a virtual section for the hero Bluetooth actions (refresh & toggle);
+  // it sits above the device sections so they can be toggled by keyboard
+  // even when off and no device rows exist.
+  property bool scanning: false
+  property int headerIndex: 0
+  readonly property bool canToggleBluetooth: !!root.adapter
+  readonly property bool canScanBluetooth: !!root.adapter && root.adapter.enabled
+  readonly property int refreshHeaderIndex: canScanBluetooth ? 0 : -1
+  readonly property int toggleHeaderIndex: canToggleBluetooth ? (canScanBluetooth ? 1 : 0) : -1
+  readonly property int headerActionCount: (canScanBluetooth ? 1 : 0) + (canToggleBluetooth ? 1 : 0)
+  readonly property bool refreshHeaderHasCursor: cursorActive && focusSection === "header" && headerIndex === refreshHeaderIndex
+  readonly property bool toggleHeaderHasCursor: cursorActive && focusSection === "header" && headerIndex === toggleHeaderIndex
+  readonly property bool headerHasCursor: toggleHeaderHasCursor
   readonly property string toggleHint: root.adapter && root.adapter.enabled ? "Turn Bluetooth off" : "Turn Bluetooth on"
 
   readonly property color hoverFill: bar
@@ -357,14 +367,19 @@ Panel {
     }
   }
 
-  function setHeaderCursor() {
+  function setHeaderCursor(index) {
     cursorActive = true
     focusSection = "header"
     actionFocused = false
+    headerIndex = (index !== undefined) ? index : toggleHeaderIndex
   }
 
   function moveCursorH(delta) {
     if (!cursorActive) { cursorActive = true; return }
+    if (focusSection === "header") {
+      headerIndex = Math.max(0, Math.min(headerActionCount - 1, headerIndex + delta))
+      return
+    }
     if (focusSection !== "known" && focusSection !== "connected") return
     var dev = deviceAt(focusSection, selectedIndex)
     if (!dev || !dev.address) return
@@ -374,7 +389,8 @@ Panel {
 
   function activateCursor() {
     if (focusSection === "header") {
-      toggleBluetooth()
+      if (headerIndex === refreshHeaderIndex) scanBluetoothDevices()
+      else toggleBluetooth()
       return
     }
     if (actionFocused) {
@@ -577,6 +593,37 @@ Panel {
     if (adapter !== null && adapter.discovering) adapter.discovering = false
   }
 
+  Process {
+    id: scanProc
+    command: ["hyprvibe-bluetooth-device", "scan"]
+    onExited: function(exitCode, exitStatus) {
+      root.scanning = false
+    }
+  }
+
+  Timer {
+    id: scanTimer
+    interval: 3000
+    repeat: false
+    onTriggered: {
+      root.scanning = false
+    }
+  }
+
+  function scanBluetoothDevices() {
+    if (!canScanBluetooth || scanning) return
+    scanning = true
+    if (adapter) {
+      owesDiscoveryStop = true
+      adapter.discovering = true
+    }
+    if (!scanProc.running) {
+      scanProc.command = ["hyprvibe-bluetooth-device", "scan"]
+      scanProc.running = true
+    }
+    scanTimer.restart()
+  }
+
   Timer {
     id: pendingTimeout
     interval: 20000
@@ -696,7 +743,7 @@ Panel {
         // ---------- Hero: Bluetooth icon · status ----------
         Item {
           width: parent.width
-          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, powerSwitch.implicitHeight)
+          implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroActions.implicitHeight)
 
           // Status only — the switch owns toggling, mouse and keyboard alike.
           Text {
@@ -711,23 +758,91 @@ Panel {
             opacity: root.adapter && root.adapter.enabled ? 1.0 : 0.5
           }
 
-          // Compact on/off switch on the trailing edge of the hero, and the
-          // header's only cursor target.
-          ToggleSwitch {
-            id: powerSwitch
-            visible: !!root.adapter
-            checked: !!root.adapter && root.adapter.enabled
-            hasCursor: root.headerHasCursor
-            foreground: root.bar.foreground
+          RowLayout {
+            id: heroActions
+            spacing: Style.space(8)
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            onHovered: function(on) { if (on) root.setHeaderCursor() }
-            onToggled: root.toggleBluetooth()
 
-            PanelToolTip {
-              visible: powerSwitch.containsMouse
-              text: root.toggleHint
-              fontFamily: root.bar.fontFamily
+            Item {
+              id: refreshButton
+              visible: root.canScanBluetooth
+              enabled: !root.scanning
+
+              readonly property bool hot: (mouseArea.containsMouse || root.refreshHeaderHasCursor) && enabled
+              readonly property int cursorPad: Style.space(4)
+              readonly property int buttonSize: Style.space(22)
+
+              implicitWidth: buttonSize + cursorPad * 2
+              implicitHeight: buttonSize + cursorPad * 2
+              Layout.alignment: Qt.AlignVCenter
+
+              // Thin hover-cursor border ring matching ToggleSwitch (no background fill)
+              BorderSurface {
+                anchors.fill: parent
+                visible: refreshButton.hot
+                color: "transparent"
+                radius: Style.cornerRadius
+                borderSpec: Border.controlSpec("hover-cursor", root.bar.foreground, ThemeColor.accent)
+              }
+
+              // Clickable icon centered inside (no color change on hover)
+              Text {
+                id: refreshIcon
+                anchors.centerIn: parent
+                text: ""
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.icon
+                color: refreshButton.enabled ? root.bar.foreground : Qt.darker(root.bar.foreground, 2.0)
+                textFormat: Text.PlainText
+
+                NumberAnimation on rotation {
+                  running: root.scanning
+                  from: 0
+                  to: 360
+                  duration: 800
+                  loops: Animation.Infinite
+                }
+
+                onRotationChanged: {
+                  if (!root.scanning && rotation !== 0) rotation = 0
+                }
+              }
+
+              MouseArea {
+                id: mouseArea
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: refreshButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                enabled: refreshButton.enabled
+                onContainsMouseChanged: {
+                  if (containsMouse) root.setHeaderCursor(root.refreshHeaderIndex)
+                }
+                onClicked: root.scanBluetoothDevices()
+              }
+
+              PanelToolTip {
+                visible: mouseArea.containsMouse
+                text: root.scanning ? "Scanning devices…" : "Scan for devices"
+                fontFamily: root.bar.fontFamily
+              }
+            }
+
+            ToggleSwitch {
+              id: powerSwitch
+              visible: root.canToggleBluetooth
+              checked: !!root.adapter && root.adapter.enabled
+              hasCursor: root.toggleHeaderHasCursor
+              foreground: root.bar.foreground
+              Layout.alignment: Qt.AlignVCenter
+              onHovered: function(on) { if (on) root.setHeaderCursor(root.toggleHeaderIndex) }
+              onToggled: root.toggleBluetooth()
+
+              PanelToolTip {
+                visible: powerSwitch.containsMouse
+                text: root.toggleHint
+                fontFamily: root.bar.fontFamily
+              }
             }
           }
 
@@ -736,7 +851,7 @@ Panel {
             anchors.left: heroIcon.right
             anchors.leftMargin: Style.space(14)
             anchors.right: parent.right
-            anchors.rightMargin: powerSwitch.visible ? powerSwitch.width + Style.space(12) : 0
+            anchors.rightMargin: heroActions.visible ? heroActions.width + Style.space(12) : 0
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
 

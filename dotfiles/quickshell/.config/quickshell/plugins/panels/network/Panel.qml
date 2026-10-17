@@ -130,12 +130,15 @@ Panel {
   // radio to switch. On a wired box it would otherwise sit there reading
   // "off" beside a perfectly live Ethernet connection.
   readonly property bool canToggleWifi: networkManagerAvailable && wifiStationAvailable
+  readonly property bool canScanWifi: networkManagerAvailable && wifiStationAvailable && Networking.wifiEnabled
   readonly property int qrHeaderIndex: -1
   readonly property int speedHeaderIndex: -1
-  readonly property int toggleHeaderIndex: canToggleWifi ? 0 : -1
-  readonly property int headerActionCount: canToggleWifi ? 1 : 0
+  readonly property int refreshHeaderIndex: canScanWifi ? 0 : -1
+  readonly property int toggleHeaderIndex: canToggleWifi ? (canScanWifi ? 1 : 0) : -1
+  readonly property int headerActionCount: (canScanWifi ? 1 : 0) + (canToggleWifi ? 1 : 0)
   readonly property bool qrHeaderHasCursor: false
   readonly property bool speedHeaderHasCursor: false
+  readonly property bool refreshHeaderHasCursor: cursorActive && focusSection === "header" && headerIndex === refreshHeaderIndex
   readonly property bool toggleHeaderHasCursor: cursorActive && focusSection === "header" && headerIndex === toggleHeaderIndex
   readonly property string toggleHint: Networking.wifiEnabled ? "Turn Wi-Fi off" : "Turn Wi-Fi on"
   readonly property var dnsProviders: ["DHCP", "Cloudflare", "Google", "Custom"]
@@ -223,7 +226,8 @@ Panel {
   }
 
   function activateHeader() {
-    if (headerIndex === qrHeaderIndex) summonWifiQr()
+    if (headerIndex === refreshHeaderIndex) scanWifiNetworks()
+    else if (headerIndex === qrHeaderIndex) summonWifiQr()
     else if (headerIndex === speedHeaderIndex) summonSpeedTest()
     else if (headerIndex === toggleHeaderIndex) toggleNetwork()
   }
@@ -816,6 +820,25 @@ Panel {
     }
   }
 
+  // Shells out to network wrapper to force instant Wi-Fi rescan
+  Process {
+    id: scanProc
+    command: ["hyprvibe-network-status", "--scan"]
+    onExited: function(exitCode, exitStatus) {
+      root.syncWifiNetworks()
+    }
+  }
+
+  function scanWifiNetworks() {
+    if (!canScanWifi || scanning) return
+    scanning = true
+    if (!scanProc.running) {
+      scanProc.command = ["hyprvibe-network-status", "--scan"]
+      scanProc.running = true
+    }
+    refresh(true)
+  }
+
   Timer {
     id: scanRestart
     interval: 100
@@ -1112,6 +1135,70 @@ Panel {
           spacing: Style.space(8)
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
+
+          Item {
+            id: refreshButton
+            visible: root.canScanWifi
+            enabled: !root.scanning
+
+            readonly property bool hot: (mouseArea.containsMouse || root.refreshHeaderHasCursor) && enabled
+            readonly property int cursorPad: Style.space(4)
+            readonly property int buttonSize: Style.space(22)
+
+            implicitWidth: buttonSize + cursorPad * 2
+            implicitHeight: buttonSize + cursorPad * 2
+            Layout.alignment: Qt.AlignVCenter
+
+            // Thin hover-cursor border ring matching ToggleSwitch (no background fill)
+            BorderSurface {
+              anchors.fill: parent
+              visible: refreshButton.hot
+              color: "transparent"
+              radius: Style.cornerRadius
+              borderSpec: Border.controlSpec("hover-cursor", root.bar.foreground, ThemeColor.accent)
+            }
+
+            // Clickable icon centered inside (no color change on hover)
+            Text {
+              id: refreshIcon
+              anchors.centerIn: parent
+              text: ""
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.icon
+              color: refreshButton.enabled ? root.bar.foreground : Qt.darker(root.bar.foreground, 2.0)
+              textFormat: Text.PlainText
+
+              NumberAnimation on rotation {
+                running: root.scanning
+                from: 0
+                to: 360
+                duration: 800
+                loops: Animation.Infinite
+              }
+
+              onRotationChanged: {
+                if (!root.scanning && rotation !== 0) rotation = 0
+              }
+            }
+
+            MouseArea {
+              id: mouseArea
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: refreshButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+              enabled: refreshButton.enabled
+              onContainsMouseChanged: {
+                if (containsMouse) root.setHeaderCursor(root.refreshHeaderIndex)
+              }
+              onClicked: root.scanWifiNetworks()
+            }
+
+            PanelToolTip {
+              visible: mouseArea.containsMouse
+              text: root.scanning ? "Scanning networks…" : "Scan for networks"
+              fontFamily: root.bar.fontFamily
+            }
+          }
 
           ToggleSwitch {
             id: powerSwitch
