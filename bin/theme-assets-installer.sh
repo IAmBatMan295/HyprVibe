@@ -4,6 +4,7 @@ set -eEuo pipefail
 
 MIN_ATTEMPTS=3
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 COMMON_LIB="${SCRIPT_DIR}/lib/common.sh"
 
 if [[ ! -r "$COMMON_LIB" ]]; then
@@ -162,50 +163,108 @@ verify_yamis_install() {
     yamis_installed
 }
 
-install_qylock_sddm_once() {
-    if [[ -d "/usr/share/sddm/themes/orbital" ]]; then
-        log_success "Qylock (orbital) SDDM theme is already installed."
-        return 0
-    fi
+install_hyprvibe_sddm_once() {
+    local source_theme_dir="${ROOT_DIR}/dotfiles/sddm/themes/hyprvibe"
+    local sddm_dir="${ROOT_DIR}/dotfiles/sddm"
 
-    local tmp_dir
-    tmp_dir="$(mktemp -d)" || return 1
-
-    log_info "Cloning Qylock from GitHub..."
-    if ! git clone --depth 1 "https://github.com/Darkkal44/qylock.git" "${tmp_dir}/qylock" >/dev/null 2>&1; then
-        log_error "Failed to clone Qylock."
-        rm -rf "$tmp_dir"
+    if [[ ! -d "$source_theme_dir" ]]; then
+        log_error "HyprVibe SDDM theme source missing at ${source_theme_dir}"
         return 1
     fi
 
-    if [[ ! -d "${tmp_dir}/qylock/themes/clockwork/orbital" ]]; then
-        log_error "Orbital theme not found in cloned Qylock repository."
-        rm -rf "$tmp_dir"
-        return 1
+    # Ensure repo gitignored assets cache has seed wallpaper
+    mkdir -p "${source_theme_dir}/assets" 2>/dev/null || true
+    if [[ ! -f "${source_theme_dir}/assets/default-bg.jpg" ]]; then
+        shopt -s nullglob
+        local repo_seed_bgs=("${ROOT_DIR}/themes/catppuccin/backgrounds"/*.{jpg,jpeg,png,webp})
+        shopt -u nullglob
+        if (( ${#repo_seed_bgs[@]} > 0 )); then
+            cp -f "${repo_seed_bgs[0]}" "${source_theme_dir}/assets/default-bg.jpg" 2>/dev/null || true
+        fi
     fi
 
-    log_info "Installing orbital theme to /usr/share/sddm/themes/"
-    sudo mkdir -p /usr/share/sddm/themes/
-    sudo cp -a "${tmp_dir}/qylock/themes/clockwork/orbital" "/usr/share/sddm/themes/"
+    # Ensure theme.conf exists with seed defaults if missing
+    if [[ ! -f "${source_theme_dir}/theme.conf" ]]; then
+        cat > "${source_theme_dir}/theme.conf" <<'EOF'
+[General]
+background=assets/default-bg.jpg
+blurRadius=50
+accentColor=#a1a0fa
+surfaceColor=#1e1e2e
+textColor=#cdd6f4
+mutedColor=#9795c4
+errorColor=#f38ba8
+borderColor=#45475a
+fontFamily=JetBrainsMono Nerd Font
+fontSize=13
+EOF
+    fi
 
-    log_info "Setting orbital as the active SDDM theme..."
+    log_info "Installing HyprVibe SDDM theme to /usr/share/sddm/themes/hyprvibe..."
+    sudo mkdir -p /usr/share/sddm/themes/hyprvibe
+    sudo cp -a "${source_theme_dir}/." "/usr/share/sddm/themes/hyprvibe/"
+
+    # Ensure assets directory and seed default wallpaper exist
+    sudo mkdir -p /usr/share/sddm/themes/hyprvibe/assets
+    if [[ ! -f "/usr/share/sddm/themes/hyprvibe/assets/default-bg.jpg" ]]; then
+        local seed_bg=""
+        shopt -s nullglob
+        local seed_bgs=("${ROOT_DIR}/themes/catppuccin/backgrounds"/*.{jpg,jpeg,png,webp})
+        shopt -u nullglob
+        if (( ${#seed_bgs[@]} > 0 )); then
+            seed_bg="${seed_bgs[0]}"
+            sudo cp -f "$seed_bg" "/usr/share/sddm/themes/hyprvibe/assets/default-bg.jpg"
+        fi
+    fi
+
+    # Enable user write permissions so hyprvibe-theme can dynamically sync wallpaper and colors
+    local target_user="${SUDO_USER:-$USER}"
+    local target_group
+    target_group="$(id -gn "$target_user" 2>/dev/null || echo "$target_user")"
+    sudo chown -R "${target_user}:${target_group}" /usr/share/sddm/themes/hyprvibe 2>/dev/null || true
+    sudo chmod -R 775 /usr/share/sddm/themes/hyprvibe 2>/dev/null || true
+
+    # Generate adaptive hardware scaling for SDDM Wayland greeter compositor
+    if [[ -f "${ROOT_DIR}/bin/lib/hardware-detect.sh" ]]; then
+        source "${ROOT_DIR}/bin/lib/hardware-detect.sh"
+        sync_sddm_compositor_config "${ROOT_DIR}"
+    fi
+
+    # Install Wayland greeter compositor config
+    if [[ -f "${sddm_dir}/hyprland.lua" ]]; then
+        log_info "Installing SDDM Wayland compositor config to /usr/share/sddm/hyprland.lua..."
+        sudo cp -f "${sddm_dir}/hyprland.lua" "/usr/share/sddm/hyprland.lua"
+    fi
+
+    # Install SDDM configuration drops
+    log_info "Configuring SDDM for Wayland and HyprVibe theme..."
     sudo mkdir -p /etc/sddm.conf.d
-    echo -e "[Theme]\nCurrent=orbital" | sudo tee /etc/sddm.conf.d/clockwork.conf > /dev/null
 
-    rm -rf "$tmp_dir"
-    log_success "Qylock SDDM theme applied."
+    if [[ -f "${sddm_dir}/10-wayland.conf" ]]; then
+        sudo cp -f "${sddm_dir}/10-wayland.conf" "/etc/sddm.conf.d/10-wayland.conf"
+    fi
+
+    if [[ -f "${sddm_dir}/10-theme.conf" ]]; then
+        sudo cp -f "${sddm_dir}/10-theme.conf" "/etc/sddm.conf.d/10-theme.conf"
+    fi
+
+    # Clean up legacy theme configurations and files
+    sudo rm -f /etc/sddm.conf.d/clockwork.conf /etc/sddm.conf.d/theme.conf 2>/dev/null || true
+    sudo rm -rf /usr/share/sddm/themes/clockwork 2>/dev/null || true
+
+    log_success "HyprVibe SDDM theme installed and activated."
     return 0
 }
 
-verify_qylock_sddm() {
-    [[ -d "/usr/share/sddm/themes/orbital" ]]
+verify_hyprvibe_sddm() {
+    [[ -d "/usr/share/sddm/themes/hyprvibe" && -f "/usr/share/sddm/themes/hyprvibe/assets/default-bg.jpg" && -f "/etc/sddm.conf.d/10-theme.conf" ]]
 }
 
 main() {
     setup_colors
 
     run_with_retries "Install YAMIS icon theme" install_yamis_once verify_yamis_install || exit 1
-    run_with_retries "Install Qylock SDDM theme" install_qylock_sddm_once verify_qylock_sddm || exit 1
+    run_with_retries "Install HyprVibe SDDM theme" install_hyprvibe_sddm_once verify_hyprvibe_sddm || exit 1
     log_phase "Theme Assets Summary"
     log_success "Theme assets installation completed successfully."
 }

@@ -1,0 +1,9 @@
+[SddmGreeterTheme]
+Name=HyprVibe
+Description=Minimalist modern Qt6 SDDM theme matching the HyprVibe aesthetic
+Author=HyprVibe
+Type=sddm-theme
+Version=1.0
+QtVersion=6
+MainScript=Main.qml
+ConfigFile=theme.conf

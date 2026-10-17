@@ -151,6 +151,68 @@ cmd_set() {
         fi
     fi
 
+    # Sync SDDM theme background and colors
+    local sddm_theme_dir="/usr/share/sddm/themes/hyprvibe"
+    local sddm_bg=""
+    if [[ -d "${target_dir}/backgrounds" ]]; then
+        shopt -s nullglob
+        local sddm_bgs=("${target_dir}/backgrounds"/*.{jpg,jpeg,png,webp})
+        shopt -u nullglob
+        if (( ${#sddm_bgs[@]} > 0 )); then
+            sddm_bg="${sddm_bgs[$((RANDOM % ${#sddm_bgs[@]}))]}"
+        fi
+    fi
+
+    local sddm_accent sddm_bg_col sddm_fg_col sddm_muted sddm_error sddm_border
+    sddm_accent="$(get_theme_color "accent" "#a1a0fa")"
+    sddm_bg_col="$(get_theme_color "background" "#1e1e2e")"
+    sddm_fg_col="$(get_theme_color "foreground" "#cdd6f4")"
+    sddm_muted="$(get_theme_color "muted" "#9795c4")"
+    sddm_error="$(get_theme_color "red" "#f38ba8")"
+    sddm_border="$(get_theme_color "selection" "#45475a")"
+
+    # Sync gitignored local asset cache and theme.conf for test-mode
+    local repo_sddm_dir="${ROOT_DIR}/dotfiles/sddm/themes/hyprvibe"
+    if [[ -d "$repo_sddm_dir" ]]; then
+        if [[ -n "$sddm_bg" && -f "$sddm_bg" ]]; then
+            mkdir -p "${repo_sddm_dir}/assets" 2>/dev/null || true
+            cp -f "$sddm_bg" "${repo_sddm_dir}/assets/default-bg.jpg" 2>/dev/null || true
+        fi
+        cat > "${repo_sddm_dir}/theme.conf" 2>/dev/null <<EOF || true
+[General]
+background=assets/default-bg.jpg
+blurRadius=50
+accentColor=${sddm_accent}
+surfaceColor=${sddm_bg_col}
+textColor=${sddm_fg_col}
+mutedColor=${sddm_muted}
+errorColor=${sddm_error}
+borderColor=${sddm_border}
+fontFamily=JetBrainsMono Nerd Font
+fontSize=13
+EOF
+    fi
+
+    if [[ -d "$sddm_theme_dir" && -w "$sddm_theme_dir" ]]; then
+        if [[ -n "$sddm_bg" && -f "$sddm_bg" ]]; then
+            mkdir -p "${sddm_theme_dir}/assets" 2>/dev/null || true
+            cp -f "$sddm_bg" "${sddm_theme_dir}/assets/default-bg.jpg" 2>/dev/null || true
+        fi
+        cat > "${sddm_theme_dir}/theme.conf" 2>/dev/null <<EOF || true
+[General]
+background=assets/default-bg.jpg
+blurRadius=50
+accentColor=${sddm_accent}
+surfaceColor=${sddm_bg_col}
+textColor=${sddm_fg_col}
+mutedColor=${sddm_muted}
+errorColor=${sddm_error}
+borderColor=${sddm_border}
+fontFamily=JetBrainsMono Nerd Font
+fontSize=13
+EOF
+    fi
+
     # GTK / GSettings retint (if desktop session active)
     if command -v gsettings >/dev/null 2>&1 && [[ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]]; then
         local mode

@@ -326,6 +326,14 @@ main() {
     run_module "github-auth.sh" || exit 1
     run_module "install-packages.sh" || exit 1
     run_module "theme-assets-installer.sh" || exit 1
+
+    log_phase "Hardware Display & Scaling Detection"
+    if [[ -f "${HYPRVIBE_TARGET_DIR}/bin/lib/hardware-detect.sh" ]]; then
+        source "${HYPRVIBE_TARGET_DIR}/bin/lib/hardware-detect.sh"
+        ensure_monitors_config "${HYPRVIBE_TARGET_DIR}"
+        log_success "Monitor and display scaling configuration verified."
+    fi
+
     run_module "stow-dotfiles.sh" || exit 1
 
     log_phase "Theme Engine Initialization"

@@ -55,15 +55,17 @@ run_cmd() {
     STATE=$(hyprctl getoption misc.vrr -j 2>/dev/null | grep '"int": 0' || true)
     if [ -z "$STATE" ]; then
         MON_INFO=$(hyprctl monitors -j 2>/dev/null || true)
-        OUTPUT=$(echo "$MON_INFO" | jq -r '.[0].name // "eDP-1"' 2>/dev/null || echo "eDP-1")
-        WIDTH=$(echo "$MON_INFO" | jq -r '.[0].width // 2880' 2>/dev/null || echo "2880")
-        HEIGHT=$(echo "$MON_INFO" | jq -r '.[0].height // 1800' 2>/dev/null || echo "1800")
-        SCALE=$(echo "$MON_INFO" | jq -r '.[0].scale // 1.8' 2>/dev/null || echo "1.8")
+        OUTPUT=$(echo "$MON_INFO" | jq -r '.[0].name // empty' 2>/dev/null || true)
+        WIDTH=$(echo "$MON_INFO" | jq -r '.[0].width // empty' 2>/dev/null || true)
+        HEIGHT=$(echo "$MON_INFO" | jq -r '.[0].height // empty' 2>/dev/null || true)
+        SCALE=$(echo "$MON_INFO" | jq -r '.[0].scale // 1.0' 2>/dev/null || true)
 
-        if hyprctl eval "hl.monitor({ output = \"${OUTPUT}\", mode = \"${WIDTH}x${HEIGHT}@60\", position = \"auto\", scale = ${SCALE} })" > /dev/null 2>&1 && hyprctl eval 'hl.config({ misc = { vrr = 0 } })' > /dev/null 2>&1; then
-            notify-send -t 4000 "Power Saver Active" "Refresh rate locked to 60Hz (${OUTPUT})"
-        else
-            notify-send -u critical "Power Saver Active" "Failed to lock refresh rate to 60Hz on ${OUTPUT}"
+        if [[ -n "$OUTPUT" && -n "$WIDTH" && -n "$HEIGHT" ]]; then
+            if hyprctl eval "hl.monitor({ output = \"${OUTPUT}\", mode = \"${WIDTH}x${HEIGHT}@60\", position = \"auto\", scale = ${SCALE} })" > /dev/null 2>&1 && hyprctl eval 'hl.config({ misc = { vrr = 0 } })' > /dev/null 2>&1; then
+                notify-send -t 4000 "Power Saver Active" "Refresh rate locked to 60Hz (${OUTPUT})"
+            else
+                notify-send -u critical "Power Saver Active" "Failed to lock refresh rate to 60Hz on ${OUTPUT}"
+            fi
         fi
     fi
     ;;

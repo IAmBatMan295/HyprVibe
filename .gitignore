@@ -4,3 +4,6 @@ self_tests/
 dotfiles/gtk-4.0/.config/gtk-4.0/assets
 dotfiles/xfce4/.config/Thunar/accels.scm
 scratch/
+dotfiles/sddm/themes/hyprvibe/assets/
+dotfiles/sddm/themes/hyprvibe/theme.conf
+dotfiles/hypr/.config/hypr/config/monitors.lua

@@ -1,0 +1,6 @@
+-- Auto-generated monitor configuration for Hyprland.
+-- Generated dynamically at install time based on connected hardware.
+-- You can manually customize or add multi-monitor rules below.
+
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = {{SCALE}} })
+{{PRIMARY_RULE}}
