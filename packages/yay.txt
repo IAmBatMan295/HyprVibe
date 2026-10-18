@@ -6,6 +6,5 @@ oh-my-posh-bin
 preload
 puddletag
 rsgain
-ryzen_smu-dkms-git
 visual-studio-code-bin
 xcursor-simp1e
