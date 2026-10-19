@@ -7,18 +7,18 @@ if [[ -z "$MON_INFO" || "$MON_INFO" == "[]" ]]; then
     exit 1
 fi
 
-OUTPUT=$(echo "$MON_INFO" | jq -r '.[0].name // empty' 2>/dev/null || true)
-WIDTH=$(echo "$MON_INFO" | jq -r '.[0].width // empty' 2>/dev/null || true)
-HEIGHT=$(echo "$MON_INFO" | jq -r '.[0].height // empty' 2>/dev/null || true)
-SCALE=$(echo "$MON_INFO" | jq -r '.[0].scale // 1.0' 2>/dev/null || true)
+# Single-pass dynamic geometry parsing
+read -r OUTPUT WIDTH HEIGHT SCALE < <(echo "$MON_INFO" | jq -r '.[0] | "\(.name // "") \(.width // "") \(.height // "") \(.scale // 1.0)"' 2>/dev/null || echo "")
 
 if [[ -z "$OUTPUT" || -z "$WIDTH" || -z "$HEIGHT" ]]; then
     notify-send -u critical "Screen Mode" "Could not detect active monitor resolution"
     exit 1
 fi
 
-# Detect highest available refresh rate for native resolution
-MAX_RATE=$(echo "$MON_INFO" | jq -r '.[0].availableModes[]?' 2>/dev/null | grep "^${WIDTH}x${HEIGHT}@" | awk -F'@' '{print $2}' | sed 's/Hz//' | sort -n | tail -n 1 | cut -d. -f1 || true)
+# Detect highest available refresh rate for native resolution in a single JQ pass
+MAX_RATE=$(echo "$MON_INFO" | jq -r '
+    [.[0] as $m | ($m.availableModes[]? | select(startswith("\($m.width)x\($m.height)@")) | ltrimstr("\($m.width)x\($m.height)@") | rtrimstr("Hz") | split(".")[0] | tonumber)] | max // 120
+' 2>/dev/null || echo "120")
 [[ -z "$MAX_RATE" ]] && MAX_RATE="120"
 
 if (( MAX_RATE <= 60 )); then

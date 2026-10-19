@@ -41,6 +41,12 @@ else
         fi
     }
 
+    ensure_terminal_environment() {
+        if ! infocmp "${TERM:-}" >/dev/null 2>&1; then
+            export TERM="xterm-256color"
+        fi
+    }
+
     log_phase() {
         printf "\n%s%s==> %s%s\n" "$COLOR_BOLD" "$COLOR_BLUE" "$1" "$COLOR_RESET"
     }
@@ -59,6 +65,25 @@ else
 
     log_error() {
         printf "%s[ERROR]%s %s\n" "$COLOR_RED" "$COLOR_RESET" "$1" >&2
+    }
+
+    read_from_tty() {
+        local prompt="$1"
+        local out_var="$2"
+        local input=""
+
+        if [[ -r /dev/tty ]]; then
+            if ! read -r -p "$prompt" input </dev/tty; then
+                return 1
+            fi
+        else
+            if ! read -r -p "$prompt" input; then
+                return 1
+            fi
+        fi
+
+        printf -v "$out_var" '%s' "$input"
+        return 0
     }
 fi
 
@@ -174,6 +199,10 @@ refresh_hyprvibe_clone() {
                 log_warn "Could not pull updates (offline or local modifications). Continuing with existing local copy."
             fi
             MODULES_DIR="${HYPRVIBE_TARGET_DIR}/bin"
+            if [[ -r "${HYPRVIBE_TARGET_DIR}/bin/lib/common.sh" ]]; then
+                # shellcheck disable=SC1090
+                source "${HYPRVIBE_TARGET_DIR}/bin/lib/common.sh"
+            fi
             return 0
         else
             log_warn "Target directory ${HYPRVIBE_TARGET_DIR} exists but is not a git repository."
@@ -216,6 +245,11 @@ refresh_hyprvibe_clone() {
     if [[ ! -f "${MODULES_DIR}/install.sh" ]]; then
         log_error "Missing installer in cloned repo at ${MODULES_DIR}/install.sh"
         exit 1
+    fi
+
+    if [[ -r "${HYPRVIBE_TARGET_DIR}/bin/lib/common.sh" ]]; then
+        # shellcheck disable=SC1090
+        source "${HYPRVIBE_TARGET_DIR}/bin/lib/common.sh"
     fi
 
     log_success "Using modules from ${MODULES_DIR}"
@@ -307,6 +341,7 @@ manage_optional_plugins() {
 
 main() {
     setup_colors
+    ensure_terminal_environment
 
     if [[ "${EUID}" -eq 0 ]]; then
         log_error "Please run this script as a normal user with sudo privileges, not as root."

@@ -23,10 +23,36 @@ ENTRIES=()
 for script in "$HELPERS_DIR"/*.sh; do
     [[ -f "$script" && -x "$script" ]] || continue
 
-    # Parse metadata without executing script
-    title=$(grep -m1 '^HELPER_TITLE=' "$script" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
-    icon=$(grep -m1 '^HELPER_ICON=' "$script" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
-    order=$(grep -m1 '^HELPER_ORDER=' "$script" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || true)
+    # Parse metadata in pure Bash without external subprocess forks
+    title=""
+    icon=""
+    order=""
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ ^(function|[a-zA-Z0-9_]+\(\)|if|for|while|case) ]] && break
+        case "$line" in
+            HELPER_TITLE=*)
+                val="${line#HELPER_TITLE=}"
+                val="${val#[\"\']}"
+                val="${val%[\"\']}"
+                title="$val"
+                ;;
+            HELPER_ICON=*)
+                val="${line#HELPER_ICON=}"
+                val="${val#[\"\']}"
+                val="${val%[\"\']}"
+                icon="$val"
+                ;;
+            HELPER_ORDER=*)
+                val="${line#HELPER_ORDER=}"
+                val="${val#[\"\']}"
+                val="${val%[\"\']}"
+                order="$val"
+                ;;
+        esac
+        if [[ -n "$title" && -n "$icon" && -n "$order" ]]; then
+            break
+        fi
+    done < "$script"
 
     # Fallback title if not explicitly set
     if [[ -z "$title" ]]; then

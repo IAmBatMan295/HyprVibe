@@ -135,9 +135,12 @@ fi
 AUDIO_PARAMS=()
 if [ "$NO_AUDIO" != true ]; then
     DEFAULT_SINK=$(pactl get-default-sink 2>/dev/null || true)
-    AUDIO_SOURCE="${DEFAULT_SINK}.monitor"
-    
-    AUDIO_PARAMS=("-a=$AUDIO_SOURCE" "-R" "48000" "-C" "$AUDIO_CODEC")
+    if [ -n "$DEFAULT_SINK" ]; then
+        AUDIO_SOURCE="${DEFAULT_SINK}.monitor"
+        AUDIO_PARAMS=("--audio=$AUDIO_SOURCE" "-R" "48000" "-C" "$AUDIO_CODEC")
+    else
+        AUDIO_PARAMS=("--audio" "-R" "48000" "-C" "$AUDIO_CODEC")
+    fi
     if [ -n "$AUDIO_BITRATE" ]; then
         AUDIO_PARAMS+=("-P" "b=$AUDIO_BITRATE")
     fi

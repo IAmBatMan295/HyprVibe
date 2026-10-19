@@ -10,11 +10,11 @@ hl.bind(mainMod .. " + F", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + V", hl.dsp.window.fullscreen({ mode = 0 }))
 hl.bind(mainMod .. " + Return", hl.dsp.exec_cmd(menu))
 hl.bind(mainMod .. " + D", hl.dsp.layout("togglesplit"))
-hl.bind(mainMod .. " + R", hl.dsp.exec_cmd("~/.config/hypr/scripts/toggle-refresh.sh"))
+hl.bind(mainMod .. " + R", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/toggle-refresh.sh"))
 hl.bind(
 	mainMod .. " + B",
 	hl.dsp.exec_cmd(
-		"chromium --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding %U"
+		"chromium --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding"
 	)
 )
 hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("foot --override=main.pad=0x0 --override=colors-dark.alpha=1.0 -e nvim"))

@@ -270,7 +270,7 @@ configure_gsettings() {
 install_madsnake() {
     log_phase "Install madsnake screensaver"
 
-    local madsnake_dir="$HOME/madsnake"
+    local madsnake_dir="${USER_HOME}/madsnake"
     if [[ ! -d "$madsnake_dir" ]]; then
         log_info "Cloning madsnake repo to $madsnake_dir"
         if ! git clone https://github.com/IAmBatMan295/madsnake.git "$madsnake_dir"; then
@@ -294,21 +294,117 @@ install_madsnake() {
     log_success "madsnake install complete"
 }
 
+show_usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Modular miscellaneous system setup tasks. If no options are specified,
+all tasks are run (--all).
+
+Options:
+  --all          Run all miscellaneous setup tasks (default)
+  --uosc         Install MPV uosc and thumbfast stack
+  --plymouth     Install Plymouth glitch theme and rebuild initramfs
+  --flatpak      Configure Flatpak theme overrides
+  --gsettings    Configure dark color-scheme and terminal in gsettings
+  --madsnake     Install or update madsnake screensaver
+  --services     Enable system and user services, Wi-Fi powersave, firewall
+  -h, --help     Show this help message
+EOF
+}
+
 main() {
     setup_colors
 
-    log_info "Validating sudo credentials for miscellaneous tasks..."
-    if ! sudo -v; then
-        log_error "Sudo authorization failed."
-        exit 1
+    local run_all=false
+    local run_uosc=false
+    local run_plymouth=false
+    local run_flatpak=false
+    local run_gsettings=false
+    local run_madsnake=false
+    local run_services=false
+
+    if (( $# == 0 )); then
+        run_all=true
     fi
 
-    install_uosc_stack
-    setup_plymouth_glitch
-    configure_flatpak_themes
-    configure_gsettings
-    install_madsnake
-    enable_services
+    while (( $# > 0 )); do
+        case "$1" in
+            --all)
+                run_all=true
+                shift
+                ;;
+            --uosc)
+                run_uosc=true
+                shift
+                ;;
+            --plymouth)
+                run_plymouth=true
+                shift
+                ;;
+            --flatpak)
+                run_flatpak=true
+                shift
+                ;;
+            --gsettings)
+                run_gsettings=true
+                shift
+                ;;
+            --madsnake)
+                run_madsnake=true
+                shift
+                ;;
+            --services)
+                run_services=true
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+
+    if [[ "$run_all" == "true" ]]; then
+        run_uosc=true
+        run_plymouth=true
+        run_flatpak=true
+        run_gsettings=true
+        run_madsnake=true
+        run_services=true
+    fi
+
+    if [[ "$run_plymouth" == "true" || "$run_services" == "true" ]]; then
+        log_info "Validating sudo credentials for miscellaneous tasks..."
+        if ! sudo -v; then
+            log_error "Sudo authorization failed."
+            exit 1
+        fi
+    fi
+
+    if [[ "$run_uosc" == "true" ]]; then
+        install_uosc_stack
+    fi
+    if [[ "$run_plymouth" == "true" ]]; then
+        setup_plymouth_glitch
+    fi
+    if [[ "$run_flatpak" == "true" ]]; then
+        configure_flatpak_themes
+    fi
+    if [[ "$run_gsettings" == "true" ]]; then
+        configure_gsettings
+    fi
+    if [[ "$run_madsnake" == "true" ]]; then
+        install_madsnake
+    fi
+    if [[ "$run_services" == "true" ]]; then
+        enable_services
+    fi
 }
 
 main "$@"

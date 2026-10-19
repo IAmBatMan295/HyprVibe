@@ -33,6 +33,12 @@ setup_colors() {
     fi
 }
 
+ensure_terminal_environment() {
+    if ! infocmp "${TERM:-}" >/dev/null 2>&1; then
+        export TERM="xterm-256color"
+    fi
+}
+
 log_phase() {
     printf "\n%s%s==> %s%s\n" "$COLOR_BOLD" "$COLOR_BLUE" "$1" "$COLOR_RESET"
 }

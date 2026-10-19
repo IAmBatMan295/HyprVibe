@@ -6,23 +6,24 @@
 
 bar_widget_stats() {
   awk '
-    NR == 1 {
+    FILENAME == "/proc/stat" && FNR == 1 {
       idle = $5
       total = 0
       for (i = 2; i <= NF; i++) total += $i
       printf "cpu\t%s\t%s\n", idle, total
     }
-  ' /proc/stat
-
-  awk '
-    /^MemTotal:/ { total = $2 }
-    /^MemAvailable:/ { avail = $2 }
-    END {
-      if (total > 0) printf "memory\t%.2f\n", ((total - avail) / total) * 100
+    FILENAME == "/proc/meminfo" {
+      if (/^MemTotal:/) mem_total = $2
+      else if (/^MemAvailable:/) mem_avail = $2
     }
-  ' /proc/meminfo
-
-  awk '{ print "load\t" $1 }' /proc/loadavg
+    FILENAME == "/proc/loadavg" {
+      load = $1
+    }
+    END {
+      if (mem_total > 0) printf "memory\t%.2f\n", ((mem_total - mem_avail) / mem_total) * 100
+      printf "load\t%s\n", load
+    }
+  ' /proc/stat /proc/meminfo /proc/loadavg
 }
 
 case "${1:-}" in
@@ -38,17 +39,40 @@ case "${1:-}" in
     ;;
 esac
 
-cpu=$(top -bn1 | awk '/^%?Cpu/ {
-  gsub(/,/, "")
-  for (i = 1; i <= NF; i++) {
-    if ($(i + 1) == "id") {
-      printf "%.0f%%", 100 - $i
-      exit
-    }
-  }
-}')
+stat_cache="${XDG_RUNTIME_DIR:-/dev/shm}/hyprvibe-cpu-stat-$UID"
+read -r _ u n s i w irq sirq st _ < /proc/stat
+curr_total=$(( u + n + s + i + w + irq + sirq + st ))
+curr_active=$(( curr_total - i - w ))
 
-awk -v cpu="$cpu" '
+cpu_pct=""
+if [[ -r $stat_cache ]]; then
+  read -r prev_active prev_total < "$stat_cache"
+  diff_total=$(( curr_total - prev_total ))
+  diff_active=$(( curr_active - prev_active ))
+  if (( diff_total > 0 && diff_active >= 0 )); then
+    cpu_pct="$(( diff_active * 100 / diff_total ))%"
+  fi
+fi
+
+if [[ -z $cpu_pct ]]; then
+  sleep 0.05
+  read -r _ u2 n2 s2 i2 w2 irq2 sirq2 st2 _ < /proc/stat
+  next_total=$(( u2 + n2 + s2 + i2 + w2 + irq2 + sirq2 + st2 ))
+  next_active=$(( next_total - i2 - w2 ))
+  diff_total=$(( next_total - curr_total ))
+  diff_active=$(( next_active - curr_active ))
+  if (( diff_total > 0 && diff_active >= 0 )); then
+    cpu_pct="$(( diff_active * 100 / diff_total ))%"
+  else
+    cpu_pct="0%"
+  fi
+  curr_active=$next_active
+  curr_total=$next_total
+fi
+
+echo "$curr_active $curr_total" > "$stat_cache" 2>/dev/null || true
+
+awk -v cpu="$cpu_pct" '
   /^MemTotal:/ { total = $2 }
   /^MemAvailable:/ { avail = $2 }
   END {

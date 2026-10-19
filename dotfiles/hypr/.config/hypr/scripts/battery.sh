@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
 # Detect battery device
 BAT_DIR=""
@@ -26,24 +27,28 @@ play_alert() {
 }
 
 while true; do
-  bat_lvl=$(cat "$BAT_DIR/capacity" 2>/dev/null || echo 100)
-  bat_status=$(cat "$BAT_DIR/status" 2>/dev/null || echo "Unknown")
+  bat_lvl="$(< "$BAT_DIR/capacity")" 2>/dev/null || bat_lvl=100
+  bat_status="$(< "$BAT_DIR/status")" 2>/dev/null || bat_status="Unknown"
+
+  # Strip any unexpected whitespace
+  bat_lvl="${bat_lvl//[[:space:]]/}"
+  bat_status="${bat_status//[[:space:]]/}"
 
   if [[ "$bat_status" == "Discharging" ]]; then
     # Critical Battery at 15% or below
     if (( bat_lvl <= 15 )) && [[ ! -f "$STATE_DIR/bat_crit_sent" ]]; then
       play_alert
-      notify-send -u critical -h string:x-canonical-private-synchronous:battery "  Battery Level is Critical (${bat_lvl}%)!"
+      notify-send -u critical -h string:x-canonical-private-synchronous:battery "  Battery Level is Critical (${bat_lvl}%)!" 2>/dev/null || true
       touch "$STATE_DIR/bat_crit_sent"
 
     # Low Battery at 30% or below (above 15%)
     elif (( bat_lvl <= 30 && bat_lvl > 15 )) && [[ ! -f "$STATE_DIR/bat_low_sent" ]]; then
       play_alert
-      notify-send -u critical -h string:x-canonical-private-synchronous:battery "  Battery Level is Low (${bat_lvl}%)"
+      notify-send -u critical -h string:x-canonical-private-synchronous:battery "  Battery Level is Low (${bat_lvl}%)" 2>/dev/null || true
       touch "$STATE_DIR/bat_low_sent"
     fi
   else
-    # Reset flags when charging
+    # Reset flags when charging or full
     rm -f "$STATE_DIR/bat_crit_sent" "$STATE_DIR/bat_low_sent"
   fi
 

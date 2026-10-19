@@ -260,7 +260,8 @@ confirm_github_key_added() {
 				return 0
 				;;
 			n|no|"")
-				log_warn "Please add the key to GitHub (Settings -> SSH and GPG keys), then confirm with 'y'."
+				log_warn "Skipping key verification. Remember to add the SSH key to GitHub (Settings -> SSH and GPG keys) before pushing."
+				return 0
 				;;
 			*)
 				log_warn "Please answer yes or no."
@@ -297,4 +298,6 @@ main() {
 	log_success "GitHub SSH setup complete."
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+	main "$@"
+fi

@@ -98,26 +98,30 @@ get_theme_color() {
 render_template() {
     local template_file="$1"
     local output_file="$2"
+    local sed_script="${3:-}"
 
     if [[ ! -f "$template_file" ]]; then
         echo "Error: Template not found: $template_file" >&2
         return 1
     fi
 
-    local sed_script
-    sed_script="$(mktemp)"
-    trap 'rm -f "$sed_script"' RETURN
-
-    local key value
-    for key in "${!THEME_COLORS[@]}"; do
-        value="${THEME_COLORS[$key]}"
-        printf 's|{{ %s }}|%s|g\n' "$key" "$value" >> "$sed_script"
-    done
+    local cleanup_script=0
+    if [[ -z "$sed_script" || ! -f "$sed_script" ]]; then
+        sed_script="$(mktemp)"
+        cleanup_script=1
+        local key value
+        for key in "${!THEME_COLORS[@]}"; do
+            value="${THEME_COLORS[$key]}"
+            printf 's|{{ %s }}|%s|g\n' "$key" "$value" >> "$sed_script"
+        done
+    fi
 
     mkdir -p "$(dirname "$output_file")"
     sed -f "$sed_script" "$template_file" > "$output_file"
-    rm -f "$sed_script"
-    trap - RETURN
+
+    if (( cleanup_script == 1 )); then
+        rm -f "$sed_script"
+    fi
     return 0
 }
 
@@ -132,14 +136,27 @@ render_all_templates() {
 
     mkdir -p "$output_dir"
 
+    # Pre-compile sed substitution table once for all templates
+    local sed_script
+    sed_script="$(mktemp)"
+    trap 'rm -f "$sed_script"' EXIT RETURN
+
+    local key value
+    for key in "${!THEME_COLORS[@]}"; do
+        value="${THEME_COLORS[$key]}"
+        printf 's|{{ %s }}|%s|g\n' "$key" "$value" >> "$sed_script"
+    done
+
     local tpl filename out_name
     shopt -s nullglob
     for tpl in "$templates_dir"/*.tpl; do
         filename="$(basename "$tpl")"
         out_name="${filename%.tpl}"
-        render_template "$tpl" "${output_dir}/${out_name}"
+        render_template "$tpl" "${output_dir}/${out_name}" "$sed_script"
     done
     shopt -u nullglob
 
+    rm -f "$sed_script"
+    trap - EXIT RETURN
     return 0
 }

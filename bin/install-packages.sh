@@ -178,15 +178,23 @@ missing_packages_with_providers() {
 
     ensure_installed_pkg_cache
 
+    local candidates=()
     local pkg
-    local unresolved
     for pkg in "${all_pkgs[@]}"; do
-        if [[ -n "${INSTALLED_PKG_MAP[$pkg]+x}" ]]; then
-            continue
+        if [[ -z "${INSTALLED_PKG_MAP[$pkg]+x}" ]]; then
+            candidates+=("$pkg")
         fi
+    done
 
-        unresolved="$(pacman -T "$pkg" 2>/dev/null || true)"
-        if [[ -n "$unresolved" ]]; then
+    if (( ${#candidates[@]} == 0 )); then
+        return 0
+    fi
+
+    local unresolved=()
+    mapfile -t unresolved < <(pacman -T "${candidates[@]}" 2>/dev/null || true)
+
+    for pkg in "${unresolved[@]}"; do
+        if [[ -n "$pkg" ]]; then
             missing_out+=("$pkg")
         fi
     done

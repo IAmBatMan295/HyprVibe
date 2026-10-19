@@ -31,7 +31,7 @@ rofi_cmd() {
     -p "Profile ($active)" \
     -markup-rows \
     -theme-str 'listview { lines: 3; }' \
-    -theme ~/.config/rofi/power-menu.rasi
+    -theme "${HOME}/.config/rofi/power-menu.rasi"
 }
 
 run_rofi() {
@@ -55,10 +55,7 @@ run_cmd() {
     STATE=$(hyprctl getoption misc.vrr -j 2>/dev/null | grep '"int": 0' || true)
     if [ -z "$STATE" ]; then
         MON_INFO=$(hyprctl monitors -j 2>/dev/null || true)
-        OUTPUT=$(echo "$MON_INFO" | jq -r '.[0].name // empty' 2>/dev/null || true)
-        WIDTH=$(echo "$MON_INFO" | jq -r '.[0].width // empty' 2>/dev/null || true)
-        HEIGHT=$(echo "$MON_INFO" | jq -r '.[0].height // empty' 2>/dev/null || true)
-        SCALE=$(echo "$MON_INFO" | jq -r '.[0].scale // 1.0' 2>/dev/null || true)
+        read -r OUTPUT WIDTH HEIGHT SCALE < <(echo "$MON_INFO" | jq -r '.[0] | "\(.name // "") \(.width // "") \(.height // "") \(.scale // 1.0)"' 2>/dev/null || echo "")
 
         if [[ -n "$OUTPUT" && -n "$WIDTH" && -n "$HEIGHT" ]]; then
             if hyprctl eval "hl.monitor({ output = \"${OUTPUT}\", mode = \"${WIDTH}x${HEIGHT}@60\", position = \"auto\", scale = ${SCALE} })" > /dev/null 2>&1 && hyprctl eval 'hl.config({ misc = { vrr = 0 } })' > /dev/null 2>&1; then
