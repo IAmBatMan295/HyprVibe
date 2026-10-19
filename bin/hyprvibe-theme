@@ -244,12 +244,19 @@ EOF
         makoctl reload >/dev/null 2>&1 &
     fi
 
-    if pgrep -x kitty >/dev/null 2>&1; then
-        killall -SIGUSR1 kitty 2>/dev/null &
-    fi
-
     if command -v tmux >/dev/null 2>&1 && pgrep -x tmux >/dev/null 2>&1; then
         tmux source-file "${STATE_DIR}/tmux.conf" 2>/dev/null || true
+    fi
+
+    # Reload active Neovim instances
+    if pgrep -x nvim >/dev/null 2>&1; then
+        shopt -s nullglob
+        for sock in "${XDG_RUNTIME_DIR:-/tmp}"/nvim.*.0 "${XDG_RUNTIME_DIR:-/tmp}"/nvim* /tmp/nvim*/0; do
+            if [[ -S "$sock" ]]; then
+                nvim --server "$sock" --remote-send '<Cmd>doautocmd FocusGained<CR>' 2>/dev/null || true
+            fi
+        done
+        shopt -u nullglob
     fi
 
     flock -u 9

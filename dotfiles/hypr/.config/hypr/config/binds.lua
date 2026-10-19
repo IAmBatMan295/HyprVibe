@@ -17,7 +17,7 @@ hl.bind(
 		"chromium --disable-background-timer-throttling --disable-backgrounding-occluded-windows --disable-renderer-backgrounding %U"
 	)
 )
-hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("foot -e nvim"))
+hl.bind(mainMod .. " + N", hl.dsp.exec_cmd("foot --override=main.pad=0x0 --override=colors-dark.alpha=1.0 -e nvim"))
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("quickshell ipc call hyprvibe.bar toggle"))
 hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd(os.getenv("HOME") .. "/HyprVibe/bin/hyprvibe-theme menu"))
 

@@ -24,7 +24,6 @@ PACKAGES=(
     gtk-3.0
     gtk-4.0
     hypr
-    kitty
     madsnake
     mako
     mpd

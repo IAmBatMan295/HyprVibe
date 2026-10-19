@@ -250,6 +250,16 @@ vim.g.snacks_projects_dev = { "~/dev", "~/projects", "~/work" }
 | **Resize Width** | `<C-Left>`, `<C-Right>` |
 | **Maximize Toggle** | `<leader>wm` |
 
+### 13. 🎨 Theme Switching
+
+| Theme | Shortcut |
+| :--- | :--- |
+| **Black Metal (Monochrome)** | `<leader>1` |
+| **Gruvbox** | `<leader>2` |
+| **Tokyo Night** | `<leader>3` |
+| **Catppuccin Mocha** | `<leader>4` |
+| **Everforest** | `<leader>5` |
+
 ---
 
 ## 🔑 Essential Vim Motions

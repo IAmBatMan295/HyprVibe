@@ -90,6 +90,7 @@ f2fs-tools
 fcft
 ffmpegthumbnailer
 file-roller
+firefox
 flatpak
 foot
 frameworkintegration
@@ -97,6 +98,7 @@ frei0r-plugins
 fsarchiver
 fuse2
 fzf
+gamemode
 gd
 gdb
 gdb-common
@@ -216,6 +218,7 @@ layer-shell-qt
 lazygit
 lensfun
 less
+lib32-gamemode
 lib32-mesa
 lib32-opencl-mesa
 lib32-vulkan-radeon
@@ -402,6 +405,7 @@ power-profiles-daemon
 pps-tools
 prison
 protobuf-c
+protonplus
 protontricks
 prrte
 purpose

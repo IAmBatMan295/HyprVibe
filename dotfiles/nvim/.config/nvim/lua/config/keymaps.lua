@@ -6,33 +6,32 @@
 vim.keymap.set({ "n", "x" }, "<BS>", '"_d', { desc = "Delete without yanking" })
 
 -- Theme switching keymaps
+local theme = require("config.theme")
+
 vim.keymap.set("n", "<leader>1", function()
-  -- Switch to black-metal (default)
-  vim.cmd.colorscheme("immortal")
+  theme.apply_theme("monochrome")
   vim.notify("Switched to Black Metal Immortal theme", vim.log.levels.INFO)
 end, { desc = "Switch to Black Metal theme" })
 
 vim.keymap.set("n", "<leader>2", function()
-  -- Switch to gruvbox (transparent_mode = false is set in plugins/gruvbox.lua)
-  require("lazy").load({ plugins = { "gruvbox" } })
-  vim.cmd.colorscheme("gruvbox")
+  theme.apply_theme("gruvbox")
   vim.notify("Switched to Gruvbox theme", vim.log.levels.INFO)
 end, { desc = "Switch to Gruvbox theme" })
 
 vim.keymap.set("n", "<leader>3", function()
-  -- Switch to tokyonight-night (lazy-loaded on demand)
-  require("lazy").load({ plugins = { "tokyonight.nvim" } })
-  vim.cmd.colorscheme("tokyonight-night")
-  vim.notify("Switched to Tokyonight Night theme", vim.log.levels.INFO)
-end, { desc = "Switch to Tokyonight Night theme" })
+  theme.apply_theme("tokyo-night")
+  vim.notify("Switched to Tokyo Night theme", vim.log.levels.INFO)
+end, { desc = "Switch to Tokyo Night theme" })
 
 vim.keymap.set("n", "<leader>4", function()
-  -- Switch to catppuccin-mocha (lazy-loaded on demand)
-  require("lazy").load({ plugins = { "catppuccin" } })
-  vim.g.catppuccin_flavour = "mocha"
-  vim.cmd.colorscheme("catppuccin")
+  theme.apply_theme("catppuccin")
   vim.notify("Switched to Catppuccin Mocha theme", vim.log.levels.INFO)
 end, { desc = "Switch to Catppuccin Mocha theme" })
+
+vim.keymap.set("n", "<leader>5", function()
+  theme.apply_theme("everforest")
+  vim.notify("Switched to Everforest theme", vim.log.levels.INFO)
+end, { desc = "Switch to Everforest theme" })
 
 local _term_root = nil
 
