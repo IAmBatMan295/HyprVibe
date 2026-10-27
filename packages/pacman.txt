@@ -90,7 +90,6 @@ f2fs-tools
 fcft
 ffmpegthumbnailer
 file-roller
-firefox
 flatpak
 foot
 frameworkintegration
@@ -589,6 +588,7 @@ xorg-xset
 xorg-xwayland
 xsel
 yay
+zed
 zip
 zoxide
 zsh
