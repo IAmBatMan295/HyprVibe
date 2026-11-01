@@ -34,6 +34,10 @@ Panel {
   readonly property var pipewireNodes: Pipewire.nodes ? Pipewire.nodes.values : []
   property var pendingAudioOutputDevice: null
   property int pendingAudioOutputAttempts: 0
+  property string pairPromptAddress: ""
+  property string pairPromptType: ""
+  property string pairPromptPasskey: ""
+  property string pairPinText: ""
 
   function deviceLabel(device) {
     return Model.deviceLabel(device)
@@ -285,8 +289,8 @@ Panel {
 
   function connectDevice(device) {
     if (!device || device.connected) return
-    if (device.paired || device.bonded || device.trusted) runDeviceAction(device, "connect", "connecting")
-    else runDeviceAction(device, "pair", "connecting")
+    if (device.bonded && (device.paired || device.trusted)) runDeviceAction(device, "connect", "connecting")
+    else startPairing(device)
   }
 
   function disconnectDevice(device) {
@@ -422,6 +426,13 @@ Panel {
   }
 
   onOpenedChanged: {
+    if (!opened) {
+      if (pairProc.running) pairProc.kill()
+      pairPromptAddress = ""
+      pairPromptType = ""
+      pairPromptPasskey = ""
+      pairPinText = ""
+    }
     if (opened) {
       // Adopt a discovery session that is already running — a popout handoff
       // from another monitor, or one leaked by an instance that could not
@@ -585,12 +596,73 @@ Panel {
   // confirmed after this object is gone — and only writes the stop directly
   // when it is the last one standing.
   Component.onDestruction: {
+    if (pairProc.running) pairProc.kill()
     if (!owesDiscoveryStop) return
     var items = bar && typeof bar.moduleWidgets === "function" ? bar.moduleWidgets(moduleName) : []
     for (var i = 0; i < items.length; i++) {
       if (items[i] && items[i] !== root) { items[i].owesDiscoveryStop = true; return }
     }
     if (adapter !== null && adapter.discovering) adapter.discovering = false
+  }
+
+  Process {
+    id: pairProc
+    stdinEnabled: true
+    stdout: SplitParser {
+      onRead: function(line) {
+        var parts = line.trim().split(" ")
+        if (parts[0] === "PROMPT") {
+          root.pairPromptType = parts[1] || "confirmation"
+          root.pairPromptPasskey = parts[2] || ""
+        } else if (parts[0] === "RESULT") {
+          root.pairPromptAddress = ""
+          root.pairPromptType = ""
+          root.pairPromptPasskey = ""
+          root.pairPinText = ""
+        }
+      }
+    }
+    onExited: function(exitCode, exitStatus) {
+      root.pairPromptAddress = ""
+      root.pairPromptType = ""
+      root.pairPromptPasskey = ""
+      root.pairPinText = ""
+      root.syncPendingActions()
+    }
+  }
+
+  function startPairing(device) {
+    if (!device || !device.address) return
+    setPendingAction(device.address, "connecting")
+    if (pairProc.running) pairProc.kill()
+    pairPromptAddress = device.address
+    pairPromptType = ""
+    pairPromptPasskey = ""
+    pairPinText = ""
+    pairProc.command = ["hyprvibe-bluetooth-pair", device.address]
+    pairProc.running = true
+  }
+
+  function confirmPairPrompt(val) {
+    if (pairProc.running) {
+      var response = (val !== undefined && val !== "" ? val : (pairPinText !== "" ? pairPinText : "yes"))
+      pairProc.write(response + "\n")
+    }
+    pairPromptAddress = ""
+    pairPromptType = ""
+    pairPromptPasskey = ""
+    pairPinText = ""
+  }
+
+  function cancelPairPrompt() {
+    if (pairProc.running) {
+      pairProc.write("no\n")
+      pairProc.kill()
+    }
+    pairPromptAddress = ""
+    pairPromptType = ""
+    pairPromptPasskey = ""
+    pairPinText = ""
   }
 
   Process {
@@ -722,6 +794,7 @@ Panel {
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
+      blocked: root.pairPromptAddress !== ""
       onMoveRequested: function(dx, dy) {
         if (!root.cursorActive) { root.cursorActive = true; return }
         if (dy !== 0) root.moveCursor(dy)
@@ -1007,6 +1080,7 @@ Panel {
     required property string sectionName
     required property bool isDiscovered
 
+    readonly property bool isPromptOpen: root.pairPromptAddress !== "" && root.pairPromptAddress === (dev ? dev.address : "")
     readonly property bool isConnected: dev && dev.connected
     readonly property int devState: dev && dev.state !== undefined ? dev.state : -1
     readonly property string action: root.pendingAction(dev ? dev.address : "")
@@ -1021,7 +1095,7 @@ Panel {
     readonly property bool forgetAvailable: (sectionName === "known" || sectionName === "connected") && !isDiscovered
     readonly property bool showForgetButton: forgetAvailable && (rowMouse.containsMouse || rowSelected)
 
-    hasCursor: rowSelected && !root.actionFocused
+    hasCursor: rowSelected && !root.actionFocused && !row.isPromptOpen
     current: isConnected
     foreground: root.bar.foreground
     fill: root.hoverFill
@@ -1029,6 +1103,7 @@ Panel {
 
     readonly property string statusText: {
       if (!dev) return ""
+      if (row.isPromptOpen) return "Pairing…"
       if (action === "forgetting") return "Forgetting…"
       if (action === "disconnecting" || devState === 2) return "Disconnecting…"
       if (isConnected) {
@@ -1042,15 +1117,18 @@ Panel {
 
     readonly property color statusColor: {
       if (isConnected) return root.bar.foreground
-      if (action !== "" || devState === 3 || dev.pairing === true) return root.bar.foreground
+      if (action !== "" || devState === 3 || dev.pairing === true || row.isPromptOpen) return root.bar.foreground
       return Qt.darker(root.bar.foreground, 1.5)
     }
 
-    implicitHeight: rowContent.implicitHeight + Style.spacing.rowPaddingX
+    implicitHeight: (rowContent.implicitHeight + Style.spacing.rowPaddingX) + (row.isPromptOpen ? (promptPanel.implicitHeight + Style.space(8)) : 0)
 
     MouseArea {
       id: rowMouse
-      anchors.fill: parent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      height: rowContent.implicitHeight + Style.spacing.rowPaddingX
       hoverEnabled: true
       acceptedButtons: Qt.LeftButton | Qt.RightButton
       cursorShape: row.dev ? Qt.PointingHandCursor : Qt.ArrowCursor
@@ -1063,6 +1141,7 @@ Panel {
       }
 
       onClicked: function(mouse) {
+        if (row.isPromptOpen) return
         var dev = root.deviceFor(row)
         if (!dev) return
         if (mouse.button === Qt.RightButton) {
@@ -1076,7 +1155,7 @@ Panel {
     }
 
     PanelToolTip {
-      visible: row.actionTooltip !== "" && rowMouse.containsMouse && !root.actionFocused
+      visible: row.actionTooltip !== "" && rowMouse.containsMouse && !root.actionFocused && !row.isPromptOpen
       text: row.actionTooltip
       fontFamily: root.bar.fontFamily
     }
@@ -1085,7 +1164,8 @@ Panel {
       id: rowContent
       anchors.left: parent.left
       anchors.right: parent.right
-      anchors.verticalCenter: parent.verticalCenter
+      anchors.top: parent.top
+      anchors.topMargin: Style.spacing.rowPaddingX / 2
       anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
       implicitHeight: Math.max(deviceIcon.implicitHeight, info.implicitHeight, forgetBtn.implicitHeight)
@@ -1135,7 +1215,7 @@ Panel {
         id: forgetBtn
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        visible: row.showForgetButton
+        visible: row.showForgetButton && !row.isPromptOpen
         iconText: "󰅙"
         tooltipText: "Forget"
         foreground: root.bar.foreground
@@ -1156,6 +1236,91 @@ Panel {
           var dev = root.deviceFor(row)
           if (!dev) return
           root.forgetDevice(dev)
+        }
+      }
+    }
+
+    Item {
+      id: promptPanel
+      visible: row.isPromptOpen
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: rowContent.bottom
+      anchors.topMargin: Style.space(4)
+      anchors.leftMargin: Style.space(10)
+      anchors.rightMargin: Style.space(10)
+      implicitHeight: promptRow.implicitHeight
+      height: implicitHeight
+
+      RowLayout {
+        id: promptRow
+        anchors.left: parent.left
+        anchors.right: parent.right
+        spacing: Style.space(6)
+
+        TextField {
+          id: pinField
+          visible: root.pairPromptType === "pin" || root.pairPromptType === "passkey"
+          Layout.fillWidth: true
+          placeholderText: root.pairPromptType === "pin" ? "Enter PIN" : "Enter Passkey"
+          font.family: Style.font.family
+          font.pixelSize: Style.font.bodySmall
+          foreground: root.bar.foreground
+          horizontalPadding: Style.spacing.controlGap
+          verticalPadding: Style.spacing.controlPaddingY
+          text: root.pairPinText
+          onTextChanged: if (row.isPromptOpen && text !== root.pairPinText) root.pairPinText = text
+          onAccepted: root.confirmPairPrompt(text)
+          Keys.onEscapePressed: root.cancelPairPrompt()
+          Component.onCompleted: Qt.callLater(forceActiveFocus)
+        }
+
+        Text {
+          id: promptLabel
+          visible: !(root.pairPromptType === "pin" || root.pairPromptType === "passkey")
+          Layout.fillWidth: true
+          textFormat: Text.PlainText
+          text: {
+            if (root.pairPromptType === "confirmation") {
+              return root.pairPromptPasskey !== "" ? ("Pair code: " + root.pairPromptPasskey) : "Confirm pairing?"
+            }
+            if (root.pairPromptType === "display" || root.pairPromptType === "display_pin") {
+              return "Code on device: " + root.pairPromptPasskey
+            }
+            if (root.pairPromptType === "authorize") {
+              return "Authorize connection?"
+            }
+            return "Initiating pairing…"
+          }
+          color: root.bar.foreground
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.bodySmall
+          font.bold: true
+          elide: Text.ElideRight
+        }
+
+        Button {
+          text: "Cancel"
+          iconText: "󰅙"
+          bordered: true
+          foreground: root.bar.foreground
+          fontSize: Style.font.caption
+          horizontalPadding: Style.space(8)
+          verticalPadding: Style.space(3)
+          onClicked: root.cancelPairPrompt()
+        }
+
+        Button {
+          visible: root.pairPromptType !== "display" && root.pairPromptType !== "display_pin"
+          text: "Pair"
+          iconText: "󰄬"
+          bordered: true
+          foreground: root.bar.foreground
+          fontSize: Style.font.caption
+          horizontalPadding: Style.space(8)
+          verticalPadding: Style.space(3)
+          enabled: (root.pairPromptType !== "pin" && root.pairPromptType !== "passkey") || pinField.text.length > 0
+          onClicked: root.confirmPairPrompt(pinField.text)
         }
       }
     }

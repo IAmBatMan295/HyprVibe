@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+"""
+hyprvibe-bluetooth-pair: Ephemeral Bluetooth Pairing Agent with stdin/stdout IPC
+Registers a temporary D-Bus agent with BlueZ, coordinates pairing prompts via stdout/stdin,
+ensures proper Link Key bonding (Bonded: yes), and exits immediately after.
+"""
+
+import sys
+import os
+import re
+import signal
+
+if len(sys.argv) < 2 or sys.argv[1] in ("-h", "--help"):
+    print("Usage: hyprvibe-bluetooth-pair <device-address>")
+    sys.exit(0)
+
+address = sys.argv[1].strip()
+if not re.match(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$", address):
+    print(f"Error: Invalid Bluetooth MAC address: {address}", file=sys.stderr)
+    sys.exit(1)
+
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+from gi.repository import GLib
+
+AGENT_PATH = "/org/bluez/hyprvibe/agent"
+AGENT_INTERFACE = "org.bluez.Agent1"
+AGENT_MANAGER_INTERFACE = "org.bluez.AgentManager1"
+DEVICE_INTERFACE = "org.bluez.Device1"
+ADAPTER_INTERFACE = "org.bluez.Adapter1"
+PROPERTIES_INTERFACE = "org.freedesktop.DBus.Properties"
+
+dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+bus = dbus.SystemBus()
+loop = GLib.MainLoop()
+
+pair_success = False
+
+class HyprVibeBluetoothAgent(dbus.service.Object):
+    @dbus.service.method(AGENT_INTERFACE, in_signature="", out_signature="")
+    def Release(self):
+        pass
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="ou", out_signature="")
+    def RequestConfirmation(self, device, passkey):
+        sys.stdout.write(f"PROMPT confirmation {passkey:06d}\n")
+        sys.stdout.flush()
+        answer = sys.stdin.readline().strip().lower()
+        if answer in ("yes", "y", ""):
+            return
+        raise dbus.exceptions.DBusException("org.bluez.Error.Rejected", name="org.bluez.Error.Rejected")
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="u")
+    def RequestPasskey(self, device):
+        sys.stdout.write("PROMPT passkey\n")
+        sys.stdout.flush()
+        line = sys.stdin.readline().strip()
+        try:
+            return dbus.UInt32(int(line))
+        except Exception:
+            raise dbus.exceptions.DBusException("org.bluez.Error.Rejected", name="org.bluez.Error.Rejected")
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="s")
+    def RequestPinCode(self, device):
+        sys.stdout.write("PROMPT pin\n")
+        sys.stdout.flush()
+        line = sys.stdin.readline().strip()
+        if line:
+            return line
+        raise dbus.exceptions.DBusException("org.bluez.Error.Rejected", name="org.bluez.Error.Rejected")
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="ouq", out_signature="")
+    def DisplayPasskey(self, device, passkey, entered):
+        sys.stdout.write(f"PROMPT display {passkey:06d}\n")
+        sys.stdout.flush()
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="os", out_signature="")
+    def DisplayPinCode(self, device, pincode):
+        sys.stdout.write(f"PROMPT display_pin {pincode}\n")
+        sys.stdout.flush()
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="o", out_signature="")
+    def RequestAuthorization(self, device):
+        sys.stdout.write("PROMPT authorize\n")
+        sys.stdout.flush()
+        answer = sys.stdin.readline().strip().lower()
+        if answer in ("yes", "y", ""):
+            return
+        raise dbus.exceptions.DBusException("org.bluez.Error.Rejected", name="org.bluez.Error.Rejected")
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="os", out_signature="")
+    def AuthorizeService(self, device, uuid):
+        return
+
+    @dbus.service.method(AGENT_INTERFACE, in_signature="", out_signature="")
+    def Cancel(self):
+        sys.stdout.write("PROMPT canceled\n")
+        sys.stdout.flush()
+
+agent = HyprVibeBluetoothAgent(bus, AGENT_PATH)
+manager = dbus.Interface(bus.get_object("org.bluez", "/org/bluez"), AGENT_MANAGER_INTERFACE)
+
+def cleanup():
+    try:
+        manager.UnregisterAgent(AGENT_PATH)
+    except Exception:
+        pass
+
+try:
+    manager.RegisterAgent(AGENT_PATH, "KeyboardDisplay")
+    manager.RequestDefaultAgent(AGENT_PATH)
+except Exception as e:
+    cleanup()
+    sys.exit(1)
+
+def find_device_path(bus, address):
+    try:
+        om = dbus.Interface(bus.get_object("org.bluez", "/"), "org.freedesktop.DBus.ObjectManager")
+        objects = om.GetManagedObjects()
+        target = address.upper()
+        for path, ifaces in objects.items():
+            dev = ifaces.get("org.bluez.Device1")
+            if dev and str(dev.get("Address", "")).upper() == target:
+                return path
+    except Exception:
+        pass
+    return f"/org/bluez/hci0/dev_{address.replace(':', '_')}"
+
+dev_path = find_device_path(bus, address)
+
+def on_pair_reply():
+    global pair_success
+    pair_success = True
+    try:
+        dev_obj = bus.get_object("org.bluez", dev_path)
+        props = dbus.Interface(dev_obj, PROPERTIES_INTERFACE)
+        props.Set(DEVICE_INTERFACE, "Trusted", dbus.Boolean(True))
+    except Exception:
+        pass
+    try:
+        dev_obj = bus.get_object("org.bluez", dev_path)
+        dev = dbus.Interface(dev_obj, DEVICE_INTERFACE)
+        dev.Connect()
+    except Exception:
+        pass
+    sys.stdout.write("RESULT success\n")
+    sys.stdout.flush()
+    loop.quit()
+
+def on_connect_error(err):
+    sys.stdout.write(f"RESULT error {err}\n")
+    sys.stdout.flush()
+    loop.quit()
+
+def on_pair_error(err):
+    err_str = str(err)
+    if "AlreadyExists" in err_str:
+        try:
+            dev_obj = bus.get_object("org.bluez", dev_path)
+            dev = dbus.Interface(dev_obj, DEVICE_INTERFACE)
+            dev.Connect(reply_handler=on_pair_reply, error_handler=on_connect_error)
+            return
+        except Exception as e:
+            err_str = str(e)
+    sys.stdout.write(f"RESULT error {err_str}\n")
+    sys.stdout.flush()
+    loop.quit()
+
+def on_timeout():
+    sys.stdout.write("RESULT timeout\n")
+    sys.stdout.flush()
+    loop.quit()
+    return False
+
+GLib.timeout_add_seconds(35, on_timeout)
+
+try:
+    dev_obj = bus.get_object("org.bluez", dev_path)
+    device = dbus.Interface(dev_obj, DEVICE_INTERFACE)
+    device.Pair(reply_handler=on_pair_reply, error_handler=on_pair_error)
+except Exception as e:
+    cleanup()
+    sys.exit(1)
+
+try:
+    loop.run()
+finally:
+    cleanup()
+
+sys.exit(0 if pair_success else 1)

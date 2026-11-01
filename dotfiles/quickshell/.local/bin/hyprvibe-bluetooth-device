@@ -38,7 +38,11 @@ case "$action" in
     ;;
   pair)
     power_on
-    timeout 20s bluetoothctl pair "$address" >/dev/null 2>&1 || true
+    if command -v hyprvibe-bluetooth-pair >/dev/null 2>&1; then
+      hyprvibe-bluetooth-pair "$address" || true
+    else
+      timeout 20s bluetoothctl --agent NoInputNoOutput pair "$address" >/dev/null 2>&1 || true
+    fi
     trust_device
     timeout 20s bluetoothctl connect "$address" >/dev/null 2>&1 || true
     ;;
