@@ -8,6 +8,7 @@ detect_monitor_info() {
     local height=1080
     local refresh=60
     local scale=1.0
+    local bitdepth=8
 
     # 1. Try hyprctl if active
     if command -v hyprctl >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
@@ -26,8 +27,14 @@ detect_monitor_info() {
             fi
             scale="$(echo "$mon_json" | jq -r '.[0].scale // 1.0' 2>/dev/null || true)"
 
+            local is_10bit
+            is_10bit="$(echo "$mon_json" | jq -r '.[0] | (.hardwareDetails.bt2020 // false) or (.hardwareDetails.hdr // false) or ((.currentFormat // "") | contains("2101010"))' 2>/dev/null || true)"
+            if [[ "$is_10bit" == "true" ]]; then
+                bitdepth=10
+            fi
+
             if [[ -n "$mon_name" ]]; then
-                printf "%s %s %s %s %s\n" "$mon_name" "$width" "$height" "$refresh" "$scale"
+                printf "%s %s %s %s %s %s\n" "$mon_name" "$width" "$height" "$refresh" "$scale" "$bitdepth"
                 return 0
             fi
         fi
@@ -52,12 +59,31 @@ detect_monitor_info() {
                 fi
             fi
 
-            # Detect max refresh rate from EDID if possible
-            if command -v edid-decode >/dev/null 2>&1 && [[ -f "${dir}/edid" && -s "${dir}/edid" ]]; then
-                local edid_max_hz
-                edid_max_hz="$(edid-decode "${dir}/edid" 2>/dev/null | grep -iE 'Max(imum)? Refresh Rate:' | grep -oE '[0-9]+' | sort -nr | head -n 1 || true)"
-                if [[ -n "$edid_max_hz" && "$edid_max_hz" -gt 0 ]]; then
-                    refresh="$edid_max_hz"
+            # Detect max refresh rate and 10-bit support from EDID if possible
+            if [[ -f "${dir}/edid" && -s "${dir}/edid" ]]; then
+                if command -v edid-decode >/dev/null 2>&1; then
+                    local edid_max_hz
+                    edid_max_hz="$(edid-decode "${dir}/edid" 2>/dev/null | grep -iE 'Max(imum)? Refresh Rate:' | grep -oE '[0-9]+' | sort -nr | head -n 1 || true)"
+                    if [[ -n "$edid_max_hz" && "$edid_max_hz" -gt 0 ]]; then
+                        refresh="$edid_max_hz"
+                    fi
+
+                    local bpc
+                    bpc="$(edid-decode "${dir}/edid" 2>/dev/null | grep -iE 'Bits per primary color channel:' | grep -oE '[0-9]+' | head -n 1 || true)"
+                    if [[ "$bpc" == "10" || "$bpc" == "12" ]]; then
+                        bitdepth=10
+                    fi
+                else
+                    # Direct check of EDID 1.4 byte 20 (Video Input Definition, bits 6-4)
+                    local b20_hex
+                    b20_hex="$(od -An -j20 -N1 -tx1 "${dir}/edid" 2>/dev/null | tr -d ' ' || true)"
+                    if [[ -n "$b20_hex" ]]; then
+                        local b20_dec=$(( 16#$b20_hex ))
+                        local bpc_code=$(( (b20_dec >> 4) & 7 ))
+                        if (( bpc_code >= 3 )); then
+                            bitdepth=10
+                        fi
+                    fi
                 fi
             fi
 
@@ -93,7 +119,7 @@ detect_monitor_info() {
     done
 
     [[ -z "$mon_name" ]] && mon_name="eDP-1"
-    printf "%s %s %s %s %s\n" "$mon_name" "$width" "$height" "$refresh" "$scale"
+    printf "%s %s %s %s %s %s\n" "$mon_name" "$width" "$height" "$refresh" "$scale" "$bitdepth"
 }
 
 get_active_monitor_scale() {
@@ -116,7 +142,7 @@ get_active_monitor_scale() {
     # Fallback to hardware detection
     local mon_info
     mon_info="$(detect_monitor_info)"
-    read -r _ _ _ _ scale <<< "$mon_info"
+    read -r _ _ _ _ scale _ <<< "$mon_info"
     printf "%s\n" "${scale:-1.0}"
 }
 
@@ -127,12 +153,16 @@ ensure_monitors_config() {
 
     mkdir -p "$(dirname "$target_file")"
 
-    local mon_name width height refresh scale
-    read -r mon_name width height refresh scale <<< "$(detect_monitor_info)"
+    local mon_name width height refresh scale bitdepth
+    read -r mon_name width height refresh scale bitdepth <<< "$(detect_monitor_info)"
 
     local primary_rule=""
     if [[ -n "$mon_name" ]]; then
-        primary_rule="hl.monitor({ output = \"${mon_name}\", mode = \"${width}x${height}@${refresh}\", position = \"auto\", scale = ${scale} })"
+        if [[ "$bitdepth" == "10" ]]; then
+            primary_rule="hl.monitor({ output = \"${mon_name}\", mode = \"${width}x${height}@${refresh}\", position = \"auto\", scale = ${scale}, bitdepth = 10 })"
+        else
+            primary_rule="hl.monitor({ output = \"${mon_name}\", mode = \"${width}x${height}@${refresh}\", position = \"auto\", scale = ${scale} })"
+        fi
     fi
 
     if [[ -f "$template_file" ]]; then
@@ -157,8 +187,8 @@ EOF
 
 sync_sddm_compositor_config() {
     local repo_root="${1:-$HOME/HyprVibe}"
-    local mon_name width height refresh scale
-    read -r mon_name width height refresh scale <<< "$(detect_monitor_info)"
+    local mon_name width height refresh scale bitdepth
+    read -r mon_name width height refresh scale bitdepth <<< "$(detect_monitor_info)"
 
     local active_scale
     active_scale="$(get_active_monitor_scale "$repo_root")"
@@ -176,7 +206,11 @@ sync_sddm_compositor_config() {
 
     local primary_rule=""
     if [[ -n "$mon_name" && -n "$width" && -n "$height" ]]; then
-        primary_rule="hl.monitor({ output = \"${mon_name}\", mode = \"${width}x${height}@${sddm_refresh}\", position = \"auto\", scale = ${scale} })"
+        if [[ "$bitdepth" == "10" ]]; then
+            primary_rule="hl.monitor({ output = \"${mon_name}\", mode = \"${width}x${height}@${sddm_refresh}\", position = \"auto\", scale = ${scale}, bitdepth = 10 })"
+        else
+            primary_rule="hl.monitor({ output = \"${mon_name}\", mode = \"${width}x${height}@${sddm_refresh}\", position = \"auto\", scale = ${scale} })"
+        fi
     fi
 
     local sddm_hyprland_repo="${repo_root}/dotfiles/sddm/hyprland.lua"
@@ -207,6 +241,7 @@ ${primary_rule}
 "
 
     # Write to repo
+    mkdir -p "$(dirname "$sddm_hyprland_repo")"
     printf "%s\n" "$config_content" > "$sddm_hyprland_repo" 2>/dev/null || true
 
     # Write to system if writable or non-interactive sudo available

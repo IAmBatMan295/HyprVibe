@@ -196,7 +196,7 @@ echo "  Opening directory picker for destination..."
 # ------------------------------------------------------------------------------
 DEST_DIR=$(zenity --file-selection --directory \
     --title="Wallpaper Theming - Select Target Directory" \
-    --filename="$HOME/Pictures/Wallpapers/" \
+    --filename="$HOME/Pictures/Current-Wallpapers/" \
     2>/dev/null || true)
 
 if [[ -z "$DEST_DIR" ]]; then

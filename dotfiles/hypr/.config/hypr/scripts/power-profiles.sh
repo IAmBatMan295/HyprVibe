@@ -58,7 +58,7 @@ run_cmd() {
         read -r OUTPUT WIDTH HEIGHT SCALE < <(echo "$MON_INFO" | jq -r '.[0] | "\(.name // "") \(.width // "") \(.height // "") \(.scale // 1.0)"' 2>/dev/null || echo "")
 
         if [[ -n "$OUTPUT" && -n "$WIDTH" && -n "$HEIGHT" ]]; then
-            if hyprctl eval "hl.monitor({ output = \"${OUTPUT}\", mode = \"${WIDTH}x${HEIGHT}@60\", position = \"auto\", scale = ${SCALE} })" > /dev/null 2>&1 && hyprctl eval 'hl.config({ misc = { vrr = 0 } })' > /dev/null 2>&1; then
+            if hyprctl eval "hl.monitor({ output = \"${OUTPUT}\", mode = \"${WIDTH}x${HEIGHT}@60\", position = \"auto\", scale = ${SCALE}, bitdepth = 10 })" > /dev/null 2>&1 && hyprctl eval 'hl.config({ misc = { vrr = 0 } })' > /dev/null 2>&1; then
                 notify-send -t 4000 "Power Saver Active" "Refresh rate locked to 60Hz (${OUTPUT})"
             else
                 notify-send -u critical "Power Saver Active" "Failed to lock refresh rate to 60Hz on ${OUTPUT}"

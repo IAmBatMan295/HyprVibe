@@ -125,15 +125,15 @@ cmd_set() {
     echo "$theme_name" > "${STATE_DIR}/theme.name"
     ln -sfn "$target_dir" "${STATE_DIR}/theme"
 
-    # Sync theme backgrounds to ~/Pictures/Wallpapers and signal wallpaper-changer.sh
-    local wall_dir="${USER_HOME:-$HOME}/Pictures/Wallpapers"
+    # Sync theme backgrounds to ~/Pictures/Current-Wallpapers and signal wallpaper-changer.sh
+    local wall_dir="${USER_HOME:-$HOME}/Pictures/Current-Wallpapers"
     if [[ -d "${target_dir}/backgrounds" ]]; then
         shopt -s nullglob
         local bgs=("${target_dir}/backgrounds"/*.{jpg,jpeg,png,webp})
         shopt -u nullglob
         if (( ${#bgs[@]} > 0 )); then
             mkdir -p "$wall_dir"
-            # Delete old wallpapers (files only) from Wallpapers directory
+            # Delete old wallpapers (files only) from Current-Wallpapers directory
             find "$wall_dir" -maxdepth 1 -type f -delete
             # Copy new theme backgrounds
             cp -a "${bgs[@]}" "$wall_dir/"
@@ -141,12 +141,16 @@ cmd_set() {
             local changer_script="${USER_HOME:-$HOME}/.config/hypr/scripts/wallpaper-changer.sh"
             if pgrep -f wallpaper-changer.sh >/dev/null 2>&1; then
                 pkill -SIGUSR1 -f wallpaper-changer.sh 2>/dev/null || true
-            elif [[ -x "$changer_script" ]] && command -v swaybg >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
-                killall swaybg 2>/dev/null || true
+            elif [[ -x "$changer_script" ]] && command -v awww >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
                 "$changer_script" &
-            elif command -v swaybg >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
-                killall swaybg 2>/dev/null || true
-                swaybg -i "${bgs[0]}" -m fill &
+            elif command -v awww >/dev/null 2>&1 && pgrep -x Hyprland >/dev/null 2>&1; then
+                if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+                    awww-daemon >/dev/null 2>&1 &
+                    sleep 0.1
+                fi
+                local rate
+                rate=$(hyprctl monitors 2>/dev/null | awk -F'[@.]' '/@/ {print $2; exit}' || echo "60")
+                awww img "${bgs[0]}" --transition-type random --transition-duration 1.2 --transition-fps "${rate:-60}" --resize crop >/dev/null 2>&1 || true
             fi
         fi
     fi

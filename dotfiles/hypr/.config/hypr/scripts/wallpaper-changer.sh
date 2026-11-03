@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
 # ---- CONFIG ----
-WALL_DIR="${WALL_DIR:-$HOME/Pictures/Wallpapers}"
+WALL_DIR="${WALL_DIR:-$HOME/Pictures/Current-Wallpapers}"
 INTERVAL=45
-MODE="fill" # fill | fit | stretch | center | tile
 STATE_FILE="$HOME/.local/state/hyprvibe/current_wallpaper"
 LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/hyprvibe-wallpaper-changer.lock"
 
-if ! command -v swaybg >/dev/null 2>&1; then
+if ! command -v awww >/dev/null 2>&1; then
   exit 0
 fi
 
@@ -19,21 +18,36 @@ fi
 
 mkdir -p "$(dirname "$STATE_FILE")"
 
-CURRENT_PID=""
 SLEEP_PID=""
 LAST_WALL=""
 DECK=()
+
+ensure_daemon() {
+  if ! pgrep -x awww-daemon >/dev/null 2>&1; then
+    awww-daemon 200>&- >/dev/null 2>&1 &
+    for ((i = 0; i < 30; i++)); do
+      if awww query >/dev/null 2>&1; then
+        break
+      fi
+      sleep 0.05
+    done
+  fi
+}
 
 # Detect currently displayed wallpaper on startup
 if [[ -f "$STATE_FILE" ]]; then
   LAST_WALL="$(cat "$STATE_FILE" 2>/dev/null)"
 fi
-if [[ -z "$LAST_WALL" ]]; then
-  LAST_WALL="$(pgrep -a swaybg 2>/dev/null | grep -oP '(?<=-i )\S+' | head -n 1)"
-fi
 
-# Adopt running swaybg PID to prevent orphaned processes
-CURRENT_PID="$(pgrep -o swaybg 2>/dev/null || true)"
+get_current_fps() {
+  local rate
+  rate=$(hyprctl monitors 2>/dev/null | awk -F'[@.]' '/@/ {print $2; exit}')
+  if [[ -n "$rate" && "$rate" =~ ^[0-9]+$ && "$rate" -ge 30 ]]; then
+    echo "$rate"
+  else
+    echo "60"
+  fi
+}
 
 refill_deck() {
   readarray -d '' -t DECK < <(find "$WALL_DIR" -maxdepth 1 -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) -print0 2>/dev/null | shuf -z)
@@ -68,26 +82,26 @@ change_wallpaper() {
   fi
 
   # If only 1 wallpaper and already showing it, avoid re-rendering
-  if (( count == 1 )) && [[ "${DECK[0]}" == "$LAST_WALL" ]] && [[ -n "$CURRENT_PID" ]] && kill -0 "$CURRENT_PID" 2>/dev/null; then
+  if (( count == 1 )) && [[ "${DECK[0]}" == "$LAST_WALL" ]]; then
     return
   fi
 
   local wall="${DECK[0]}"
   DECK=("${DECK[@]:1}")
 
-  # Spawn new swaybg first (close fd 200 so children don't inherit lock)
-  swaybg -i "$wall" -m "$MODE" 200>&- >/dev/null 2>&1 &
-  local new_pid=$!
+  ensure_daemon
 
-  # Allow Wayland compositor to map surface before terminating old instance
-  sleep 0.5
+  local fps
+  fps=$(get_current_fps)
 
-  # Kill previous swaybg instance
-  if [[ -n "$CURRENT_PID" && "$CURRENT_PID" != "$new_pid" ]]; then
-    kill "$CURRENT_PID" 2>/dev/null || true
-  fi
+  # Surprise effect animated transition matched to active display refresh rate
+  awww img "$wall" \
+    --transition-type random \
+    --transition-duration 1.2 \
+    --transition-fps "$fps" \
+    --transition-bezier .23,1,.32,1 \
+    --resize crop 200>&- >/dev/null 2>&1 || true
 
-  CURRENT_PID="$new_pid"
   LAST_WALL="$wall"
   echo "$wall" > "$STATE_FILE" 2>/dev/null || true
 }
@@ -101,15 +115,15 @@ on_usr1() {
 }
 
 cleanup() {
-  if [[ -n "$CURRENT_PID" ]]; then
-    kill "$CURRENT_PID" 2>/dev/null || true
-  fi
   exit 0
 }
 
 trap 'cleanup' SIGINT SIGTERM
 trap '' SIGHUP
 trap 'on_usr1' SIGUSR1
+
+# Ensure daemon is running immediately on launch
+ensure_daemon
 
 while true; do
   change_wallpaper

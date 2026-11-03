@@ -15,6 +15,7 @@ atkmm
 attica
 aurorae
 awesome-terminal-fonts
+awww
 ayatana-ido
 babl
 base
@@ -502,7 +503,6 @@ steam
 stow
 sudo
 suitesparse
-swaybg
 syndication
 syntax-highlighting
 sysbench
