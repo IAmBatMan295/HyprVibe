@@ -15,7 +15,7 @@ HELPER_ORDER=25
 # ------------------------------------------------------------------------------
 IS_INNER=false
 for a in "$@"; do
-    [[ "$a" == "--inner" || "$a" == "--headless" ]] && IS_INNER=true
+    [[ "$a" == "--inner" || "$a" == "--headless" || "$a" == "--status" || "$a" == "--set" || "$a" == "-s" ]] && IS_INNER=true
 done
 
 if [[ "$IS_INNER" == "false" ]]; then

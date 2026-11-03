@@ -16,7 +16,11 @@ BarWidget {
 
   Process {
     id: memProc
-    command: ["bash", "-c", "awk '/MemTotal:/ {total=$2} /MemAvailable:/ {avail=$2} /SwapTotal:/ {stotal=$2} /SwapFree:/ {sfree=$2} END {used=(total-avail)/(1024*1024); tot=total/(1024*1024); sused=(stotal-sfree)/(1024*1024); stot=stotal/(1024*1024); printf \"%.1f GB|Used: %.1fG / %.1fG\\nSwap: %.1fG / %.1fG\\n\", used, used, tot, sused, stot}' /proc/meminfo"]
+    command: [
+      "awk",
+      "/MemTotal:/ {total=$2} /MemAvailable:/ {avail=$2} /SwapTotal:/ {stotal=$2} /SwapFree:/ {sfree=$2} END {used=(total-avail)/(1024*1024); tot=total/(1024*1024); sused=(stotal-sfree)/(1024*1024); stot=stotal/(1024*1024); printf \"%.1f GB|Used: %.1fG / %.1fG\\nSwap: %.1fG / %.1fG\\n\", used, used, tot, sused, stot}",
+      "/proc/meminfo"
+    ]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {

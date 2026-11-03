@@ -71,7 +71,7 @@ BarWidget {
   }
 
   Timer {
-    interval: 1500
+    interval: root.isPlaying ? 1500 : 5000
     repeat: true
     running: true
     triggeredOnStart: true

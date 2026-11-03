@@ -18,7 +18,12 @@ BarWidget {
 
   Process {
     id: cpuProc
-    command: ["bash", "-c", "awk '/cpu MHz/ {sum+=$4; count++} END {if (count>0) printf \"%.1f GHz\\n\", sum/count/1000}' /proc/cpuinfo; head -n1 /proc/stat"]
+    command: [
+      "awk",
+      "/cpu MHz/ {sum+=$4; count++} /^cpu / {u=$2; n=$3; s=$4; i=$5; w=$6; q=$7; sq=$8; st=$9} END {if (count>0) printf \"%.1f GHz\\n\", sum/count/1000; printf \"cpu %d %d %d %d %d %d %d %d\\n\", u, n, s, i, w, q, sq, st}",
+      "/proc/cpuinfo",
+      "/proc/stat"
+    ]
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: {
