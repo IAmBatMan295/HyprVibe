@@ -17,7 +17,7 @@
       "center": [
         {
           "id": "hyprvibe.clock",
-          "format": "dddd  h:mm AP  d MMMM"
+          "format": "ddd d MMM h:mm AP"
         }
       ],
       "right": [
