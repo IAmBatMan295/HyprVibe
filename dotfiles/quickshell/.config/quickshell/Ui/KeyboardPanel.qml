@@ -71,6 +71,12 @@ PanelWindow {
     else root.open = false
   }
 
+  function registerPopupInteraction() {
+    if (root.open && cardHover.hovered) {
+      inactivityDismissTimer.restart()
+    }
+  }
+
   function beginFocusPrime() {
     if (open && backingWindowVisible) focusPrimeTimer.restart()
   }
@@ -227,10 +233,25 @@ PanelWindow {
     if (open) {
       focusPrimed = false
       beginFocusPrime()
+      if (cardHover.hovered) {
+        cardHover.lastX = cardHover.point ? Math.round(cardHover.point.position.x) : -1
+        cardHover.lastY = cardHover.point ? Math.round(cardHover.point.position.y) : -1
+        noHoverDismissTimer.stop()
+        inactivityDismissTimer.restart()
+      } else {
+        cardHover.lastX = -1
+        cardHover.lastY = -1
+        inactivityDismissTimer.stop()
+        noHoverDismissTimer.restart()
+      }
       if (focusTarget) Qt.callLater(function() {
         if (root.open && root.focusTarget) root.focusTarget.forceActiveFocus()
       })
     } else {
+      cardHover.lastX = -1
+      cardHover.lastY = -1
+      noHoverDismissTimer.stop()
+      inactivityDismissTimer.stop()
       focusPrimeTimer.stop()
       focusPrimed = false
     }
@@ -245,6 +266,28 @@ PanelWindow {
       popoutSwitching = false
       if (bar.activePopout === coordinatorKey) bar.releasePopout(coordinatorKey)
       if (popoutSwitchClosing) closeSwitchTimer.restart()
+    }
+  }
+
+  Timer {
+    id: noHoverDismissTimer
+    interval: 5000
+    repeat: false
+    onTriggered: {
+      if (root.open && !cardHover.hovered) {
+        root.close()
+      }
+    }
+  }
+
+  Timer {
+    id: inactivityDismissTimer
+    interval: 10000
+    repeat: false
+    onTriggered: {
+      if (root.open && cardHover.hovered) {
+        root.close()
+      }
     }
   }
 
@@ -391,6 +434,45 @@ PanelWindow {
     Behavior on opacity {
       enabled: !root.popoutSwitching && !root.popoutSwitchClosing
       NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+    }
+
+    HoverHandler {
+      id: cardHover
+      property real lastX: -1
+      property real lastY: -1
+      onHoveredChanged: {
+        if (!root.open) return
+        if (hovered) {
+          lastX = point ? Math.round(point.position.x) : -1
+          lastY = point ? Math.round(point.position.y) : -1
+          noHoverDismissTimer.stop()
+          inactivityDismissTimer.restart()
+        } else {
+          lastX = -1
+          lastY = -1
+          inactivityDismissTimer.stop()
+          noHoverDismissTimer.restart()
+        }
+      }
+      onPointChanged: {
+        if (!root.open || !hovered) return
+        var px = Math.round(point.position.x)
+        var py = Math.round(point.position.y)
+        if (px !== lastX || py !== lastY) {
+          lastX = px
+          lastY = py
+          root.registerPopupInteraction()
+        }
+      }
+    }
+
+    TapHandler {
+      gesturePolicy: TapHandler.WithinBounds
+      onTapped: root.registerPopupInteraction()
+    }
+
+    WheelHandler {
+      onWheel: root.registerPopupInteraction()
     }
 
     // Swallow clicks on the card so they don't bubble to the dismissal
