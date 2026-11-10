@@ -10,12 +10,78 @@ HELPER_TITLE="Wallpaper Theming"
 HELPER_ICON=""
 HELPER_ORDER=10
 
-PALETTES=(
-    "catppuccin-mocha|Catppuccin Mocha"
-    "everforest-dark-medium|Everforest Dark"
-    "gruvbox-dark|Gruvbox Dark"
-    "grayscale-dark|Monochrome"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
+THEMES_DIR="${ROOT_DIR}/themes"
+USER_THEMES_DIR="${HOME}/.config/hyprvibe/themes"
+
+declare -A BUILTIN_LUTGEN_MAP=(
+    ["catppuccin"]="catppuccin-mocha"
+    ["everforest"]="everforest-dark-medium"
+    ["gruvbox"]="gruvbox-dark"
+    ["monochrome"]="grayscale-dark"
 )
+
+format_title() {
+    local name="$1"
+    local spaced="${name//[-_]/ }"
+    awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) tolower(substr($i,2))}1' <<< "$spaced"
+}
+
+# Dynamically discover all themes from repo and user config directories
+PALETTES=()
+PALETTE_COLORS=()
+PALETTE_SLUGS=()
+declare -A SEEN_THEMES=()
+
+for tdir in "$THEMES_DIR" "$USER_THEMES_DIR"; do
+    [[ -d "$tdir" ]] || continue
+    for tpath in "$tdir"/*; do
+        [[ -d "$tpath" && -f "$tpath/colors.toml" ]] || continue
+        tname="$(basename "$tpath")"
+        [[ -n "${SEEN_THEMES[$tname]:-}" ]] && continue
+        SEEN_THEMES["$tname"]=1
+
+        title="$(format_title "$tname")"
+        if [[ "$tname" == "catppuccin" ]]; then
+            title="Catppuccin Mocha"
+        elif [[ "$tname" == "everforest" ]]; then
+            title="Everforest Dark"
+        elif [[ "$tname" == "gruvbox" ]]; then
+            title="Gruvbox Dark"
+        elif [[ "$tname" == "monochrome" ]]; then
+            title="Monochrome"
+        fi
+
+        # Extract unique hex colors from colors.toml
+        mapfile -t hex_colors < <(grep -oE '#[0-9a-fA-F]{6}' "$tpath/colors.toml" | sort -u)
+
+        slug="${BUILTIN_LUTGEN_MAP[$tname]:-$tname}"
+        PALETTES+=("${slug}|${title}")
+        PALETTE_SLUGS+=("$slug")
+        PALETTE_COLORS+=("${hex_colors[*]}")
+    done
+done
+
+apply_lutgen() {
+    local slug="$1"
+    local idx="$2"
+    local infile="$3"
+    local outfile="$4"
+
+    # Check if slug is recognized by lutgen built-in palettes
+    if lutgen palette names 2>/dev/null | grep -Fxq "$slug"; then
+        lutgen apply -p "$slug" -l 12 "$infile" -o "$outfile"
+    else
+        # Pass dynamic custom colors from colors.toml
+        read -r -a custom_cols <<< "${PALETTE_COLORS[$idx]}"
+        if (( ${#custom_cols[@]} > 0 )); then
+            lutgen apply -l 12 "$infile" -o "$outfile" -- "${custom_cols[@]}"
+        else
+            lutgen apply -p "grayscale-dark" -l 12 "$infile" -o "$outfile"
+        fi
+    fi
+}
 
 # ------------------------------------------------------------------------------
 # Safe Filename Generator (Non-destructive, never overwrites original)
@@ -77,7 +143,18 @@ if [[ "${1:-}" == "--headless" ]]; then
         esac
     done
 
-    IDX=$((HEADLESS_PALETTE_INDEX - 1))
+    IDX=0
+    if [[ "$HEADLESS_PALETTE_INDEX" =~ ^[0-9]+$ ]]; then
+        IDX=$((HEADLESS_PALETTE_INDEX - 1))
+    else
+        for i in "${!PALETTE_SLUGS[@]}"; do
+            if [[ "${PALETTE_SLUGS[$i]}" == "$HEADLESS_PALETTE_INDEX" || "${PALETTES[$i]%%|*}" == "$HEADLESS_PALETTE_INDEX" ]]; then
+                IDX=$i
+                break
+            fi
+        done
+    fi
+
     PALETTE_DATA="${PALETTES[$IDX]}"
     PALETTE_SLUG="${PALETTE_DATA%%|*}"
     PALETTE_NAME="${PALETTE_DATA##*|}"
@@ -86,8 +163,9 @@ if [[ "${1:-}" == "--headless" ]]; then
     for f in "${HEADLESS_FILES[@]}"; do
         if [[ -f "$f" ]]; then
             target_path=$(get_safe_target_path "$HEADLESS_OUT_DIR" "$f" "$PALETTE_SLUG")
-            lutgen apply -p "$PALETTE_SLUG" -l 12 "$f" -o "$target_path" >/dev/null 2>&1
-            ((COUNT++)) || true
+            if apply_lutgen "$PALETTE_SLUG" "$IDX" "$f" "$target_path" >/dev/null 2>&1; then
+                ((COUNT++)) || true
+            fi
         fi
     done
 
@@ -159,7 +237,7 @@ if [[ "$choice" =~ ^[qQ]$ ]]; then
     exit 0
 fi
 
-if ! [[ "$choice" =~ ^[1-5]$ ]]; then
+if ! [[ "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > ${#PALETTES[@]} )); then
     echo "Invalid choice. Exiting."
     exit 1
 fi
@@ -229,7 +307,7 @@ echo ""
         echo "# Theming wallpaper $CURRENT of $TOTAL_FILES..."
 
         target_file=$(get_safe_target_path "$DEST_DIR" "$img" "$SELECTED_PALETTE")
-        if lutgen apply -p "$SELECTED_PALETTE" -l 12 "$img" -o "$target_file" 2>/dev/null; then
+        if apply_lutgen "$SELECTED_PALETTE" "$SELECTED_IDX" "$img" "$target_file" 2>/dev/null; then
             ((SUCCESS_COUNT++)) || true
         fi
     done
