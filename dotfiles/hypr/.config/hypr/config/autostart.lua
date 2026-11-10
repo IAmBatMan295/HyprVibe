@@ -4,7 +4,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("quickshell &")
     hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1 &")
     hl.exec_cmd("hypridle")
-    hl.exec_cmd("mako &")
+    hl.exec_cmd("dunst &")
     hl.exec_cmd("hyprsunset &")
     hl.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/battery.sh &")
     

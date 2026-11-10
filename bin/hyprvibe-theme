@@ -244,8 +244,8 @@ EOF
     fi
 
 
-    if command -v makoctl >/dev/null 2>&1 && pgrep -x mako >/dev/null 2>&1; then
-        makoctl reload >/dev/null 2>&1 &
+    if command -v dunstctl >/dev/null 2>&1 && pgrep -x dunst >/dev/null 2>&1; then
+        dunstctl reload >/dev/null 2>&1 &
     fi
 
     if command -v tmux >/dev/null 2>&1 && pgrep -x tmux >/dev/null 2>&1; then

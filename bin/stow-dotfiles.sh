@@ -19,13 +19,13 @@ USER_HOME="$(resolve_user_home)"
 
 PACKAGES=(
     btop
+    dunst
     foot
     gtk-2.0
     gtk-3.0
     gtk-4.0
     hypr
     madsnake
-    mako
     mpd
     mpv
     nvim
@@ -163,6 +163,10 @@ main() {
 
     log_phase "Stow Apply"
     log_info "Processing file templates..."
+    if [[ -d "${DOTFILES_DIR}/dunst/.config/dunst/dunstrc.d" ]]; then
+        mkdir -p "${USER_HOME}/.local/state/hyprvibe/current"
+        ln -sfn "${USER_HOME}/.local/state/hyprvibe/current/dunst.conf" "${DOTFILES_DIR}/dunst/.config/dunst/dunstrc.d/00-hyprvibe-theme.conf"
+    fi
     if [[ -f "${ROOT_DIR}/templates/xfce4/thunar.xml.template" ]]; then
         local target_thunar="${USER_HOME}/.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml"
         mkdir -p "$(dirname "$target_thunar")"
