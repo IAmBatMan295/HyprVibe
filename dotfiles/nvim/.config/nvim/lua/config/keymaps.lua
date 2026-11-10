@@ -28,6 +28,11 @@ vim.keymap.set("n", "<leader>4", function()
   vim.notify("Switched to Everforest theme", vim.log.levels.INFO)
 end, { desc = "Switch to Everforest theme" })
 
+vim.keymap.set("n", "<leader>5", function()
+  theme.apply_theme("forest-green")
+  vim.notify("Switched to Forest Green theme", vim.log.levels.INFO)
+end, { desc = "Switch to Forest Green theme" })
+
 local _term_root = nil
 
 local function toggle_terminal()

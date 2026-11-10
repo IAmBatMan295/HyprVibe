@@ -7,7 +7,40 @@ return {
       opts.options.globalstatus = true
       opts.options.theme = function()
         local cs = vim.g.colors_name or ""
-        if cs:find("catppuccin") or cs == "" then
+        if cs == "forest-green" then
+          return {
+            normal = {
+              a = { fg = "#0f1a14", bg = "#6bbf7a", gui = "bold" },
+              b = { fg = "#a8e6a1", bg = "#1e2a24" },
+              c = { fg = "#5f876f", bg = "#0f1a14" },
+            },
+            insert = {
+              a = { fg = "#0f1a14", bg = "#89f6c4", gui = "bold" },
+              b = { fg = "#a8e6a1", bg = "#1e2a24" },
+              c = { fg = "#5f876f", bg = "#0f1a14" },
+            },
+            visual = {
+              a = { fg = "#0f1a14", bg = "#9d7cd8", gui = "bold" },
+              b = { fg = "#a8e6a1", bg = "#1e2a24" },
+              c = { fg = "#5f876f", bg = "#0f1a14" },
+            },
+            replace = {
+              a = { fg = "#0f1a14", bg = "#e06c75", gui = "bold" },
+              b = { fg = "#a8e6a1", bg = "#1e2a24" },
+              c = { fg = "#5f876f", bg = "#0f1a14" },
+            },
+            command = {
+              a = { fg = "#0f1a14", bg = "#e5c07b", gui = "bold" },
+              b = { fg = "#a8e6a1", bg = "#1e2a24" },
+              c = { fg = "#5f876f", bg = "#0f1a14" },
+            },
+            inactive = {
+              a = { fg = "#5f876f", bg = "#0f1a14" },
+              b = { fg = "#5f876f", bg = "#0f1a14" },
+              c = { fg = "#5f876f", bg = "#0f1a14" },
+            },
+          }
+        elseif cs:find("catppuccin") or cs == "" then
           local ok, ctp = pcall(require, "catppuccin.utils.lualine")
           if ok then
             local ok_res, theme = pcall(ctp, "mocha")

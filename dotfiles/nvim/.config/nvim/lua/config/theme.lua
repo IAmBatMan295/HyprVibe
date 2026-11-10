@@ -1,55 +1,63 @@
--- HyprVibe Centralized Theme Engine for Neovim
+-- HyprVibe Dynamic Theme Loader for Neovim
 local M = {}
 
 M.theme_file = vim.fn.expand("~/.local/state/hyprvibe/current/theme.name")
+M.active_theme = nil
+M.last_state_theme = nil
 
 M.theme_map = {
   ["catppuccin"] = "catppuccin-mocha",
+  ["monochrome"] = "immortal",
   ["everforest"] = "everforest",
   ["gruvbox"] = "gruvbox",
-  ["monochrome"] = "immortal",
+  ["forest-green"] = "forest-green",
 }
 
 M.plugin_map = {
   ["catppuccin-mocha"] = "catppuccin",
-  ["catppuccin"] = "catppuccin",
+  ["immortal"] = "black-metal",
   ["everforest"] = "everforest",
   ["gruvbox"] = "gruvbox",
-  ["immortal"] = "black-metal",
+  ["forest-green"] = "forest-green",
 }
 
 function M.get_hyprvibe_theme()
+  local disk_theme = nil
   if vim.fn.filereadable(M.theme_file) == 1 then
     local lines = vim.fn.readfile(M.theme_file)
     if #lines > 0 and lines[1] ~= "" then
-      local name = vim.trim(lines[1])
-      if M.theme_map[name] then
-        return name
-      end
+      disk_theme = vim.trim(lines[1])
     end
   end
-  return "catppuccin"
+
+  -- Detect external system theme changes
+  if disk_theme and disk_theme ~= M.last_state_theme then
+    M.last_state_theme = disk_theme
+    M.active_theme = disk_theme
+    return disk_theme
+  end
+
+  return M.active_theme or disk_theme or "catppuccin"
 end
 
 function M.sync_terminal_bg()
-  local normal = vim.api.nvim_get_hl(0, { name = "Normal" })
-  if normal and normal.bg then
-    local hex = string.format("%06x", normal.bg)
-    -- OSC 11: Set terminal default background color.
-    -- [100]#rrggbb sets 100% opacity in Foot and URxvt to prevent any background bleed.
+  local normal_hl = vim.api.nvim_get_hl(0, { name = "Normal" })
+  local bg = normal_hl.bg
+  if bg then
+    local r = bit.band(bit.rshift(bg, 16), 0xff)
+    local g = bit.band(bit.rshift(bg, 8), 0xff)
+    local b = bit.band(bg, 0xff)
+    local osc11 = string.format("\x1b]11;rgb:%02x%02x/%02x%02x/%02x%02x\x1b\\", r, r, g, g, b, b)
     pcall(function()
-      io.stdout:write(string.format("\x1b]11;[100]#%s\x1b\\", hex))
+      io.stdout:write(osc11)
       io.stdout:flush()
-    end)
-    -- Ensure MsgArea matches Normal background so command-line never shows terminal bg
-    pcall(function()
-      vim.api.nvim_set_hl(0, "MsgArea", { link = "Normal" })
     end)
   end
 end
 
 function M.apply_theme(name)
   local theme_name = name or M.get_hyprvibe_theme()
+  M.active_theme = theme_name
   local cs = M.theme_map[theme_name] or theme_name or "catppuccin-mocha"
 
   -- Ensure lazy plugin is loaded if needed
