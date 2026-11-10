@@ -19,16 +19,11 @@ vim.keymap.set("n", "<leader>2", function()
 end, { desc = "Switch to Gruvbox theme" })
 
 vim.keymap.set("n", "<leader>3", function()
-  theme.apply_theme("tokyo-night")
-  vim.notify("Switched to Tokyo Night theme", vim.log.levels.INFO)
-end, { desc = "Switch to Tokyo Night theme" })
-
-vim.keymap.set("n", "<leader>4", function()
   theme.apply_theme("catppuccin")
   vim.notify("Switched to Catppuccin Mocha theme", vim.log.levels.INFO)
 end, { desc = "Switch to Catppuccin Mocha theme" })
 
-vim.keymap.set("n", "<leader>5", function()
+vim.keymap.set("n", "<leader>4", function()
   theme.apply_theme("everforest")
   vim.notify("Switched to Everforest theme", vim.log.levels.INFO)
 end, { desc = "Switch to Everforest theme" })

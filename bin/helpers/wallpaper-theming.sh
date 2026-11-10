@@ -12,7 +12,6 @@ HELPER_ORDER=10
 
 PALETTES=(
     "catppuccin-mocha|Catppuccin Mocha"
-    "tokyo-night-dark|Tokyo Night Dark"
     "everforest-dark-medium|Everforest Dark"
     "gruvbox-dark|Gruvbox Dark"
     "grayscale-dark|Monochrome"

@@ -8,7 +8,6 @@ M.theme_map = {
   ["everforest"] = "everforest",
   ["gruvbox"] = "gruvbox",
   ["monochrome"] = "immortal",
-  ["tokyo-night"] = "tokyonight-night",
 }
 
 M.plugin_map = {
@@ -17,7 +16,6 @@ M.plugin_map = {
   ["everforest"] = "everforest",
   ["gruvbox"] = "gruvbox",
   ["immortal"] = "black-metal",
-  ["tokyonight-night"] = "tokyonight.nvim",
 }
 
 function M.get_hyprvibe_theme()

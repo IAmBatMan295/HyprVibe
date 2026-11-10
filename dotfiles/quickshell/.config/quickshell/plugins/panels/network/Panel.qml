@@ -28,32 +28,7 @@ Panel {
     identityText = ""
   }
 
-  // Live connection details from `ip` / /sys / iw.
-  property var info: ({})  // { iface, type, ip, prefix, gateway, speed, duplex, ssid, signal, freq, bitrate, rx_bytes, tx_bytes, router_ping_ms, internet_ping_ms }
 
-  // Throughput tracking. Rates are computed as deltas between successive
-  // `hyprvibe-network-status --verbose` samples (~1.5s apart via detailsPoll).
-  // We hold "prev" alongside a timestamp so the first sample after open or
-  // after an interface switch doesn't manufacture a spike.
-  property real prevRxBytes: 0
-  property real prevTxBytes: 0
-  property real prevSampleTime: 0
-  property string prevIface: ""
-  property real downloadRate: 0  // bytes/sec
-  property real uploadRate: 0    // bytes/sec
-  property string pingIface: ""
-  property var routerPingSamples: []
-  property var internetPingSamples: []
-  property real routerPingLatency: -1
-  property real internetPingLatency: -1
-  property int internetPingPacketLoss: 0
-  readonly property int pingHistoryWindow: 24
-  readonly property int pingAverageWindow: 5
-  readonly property bool hasInternetPing: internetPingSamples.length > 0
-  // Every stat row stays mounted whether or not there is data behind it, so a
-  // sample arriving late never reflows the grid. This says whether the numbers
-  // are real yet or the row should read "--".
-  readonly property bool hasTransferStats: info.rx_bytes !== undefined
   property int connectionPhraseIndex: 0
   readonly property var connectionPhrases: [
     "Wiring bits",
@@ -125,7 +100,7 @@ Panel {
   property int headerIndex: 0
   readonly property bool canDisconnect: !!connectedWifiNetwork
   readonly property bool headerHasDisconnect: false
-  readonly property bool canShareWifi: info.type === "wifi" && canShareNetwork(connectedWifiNetwork)
+  readonly property bool canShareWifi: kind === "wifi" && canShareNetwork(connectedWifiNetwork)
   // The hero switch is the Wi-Fi radio, so it only exists when there is a
   // radio to switch. On a wired box it would otherwise sit there reading
   // "off" beside a perfectly live Ethernet connection.
@@ -164,9 +139,6 @@ Panel {
   readonly property bool bandPillsVisible: canSelectBand && bandPinned
   readonly property string bandSectionTitle: Model.bandSectionTitle(bandEffective, bandCurrent)
   readonly property bool bandBusy: pendingBand !== ""
-  // The speed test needs an interface to test, so its hero action only
-  // appears once there is one.
-  readonly property bool canRunSpeedTest: !!info.iface
   property int bandIndex: 0
   // The band section has up to two cursor rows: the Automatic switch on the
   // header line, then the pills. Same shape as wifiActionFocused.
@@ -336,17 +308,6 @@ Panel {
       // the 100ms window reuses the running timer and re-enables the scanner
       // almost immediately, undoing the deferral #6605 restored.
       scanRestart.stop()
-      // Reset throughput tracking so the next open doesn't compute a fake
-      // rate from a sample taken minutes ago.
-      prevSampleTime = 0
-      downloadRate = 0
-      uploadRate = 0
-      pingIface = ""
-      routerPingSamples = []
-      internetPingSamples = []
-      routerPingLatency = -1
-      internetPingLatency = -1
-      internetPingPacketLoss = 0
       setScannerEnabled(false)
     }
   }
@@ -465,16 +426,14 @@ Panel {
     controller.hide()
     cancelPasswordPrompt()
     var payload = {}
-    if (!forceDetect && info.type === "wifi" && info.iface) {
-      payload.iface = info.iface
-      if (info.ssid) payload.ssid = info.ssid
+    if (!forceDetect && kind === "wifi" && connectedWifiNetwork) {
+      payload.ssid = connectedWifiNetwork.name
     }
     bar.shell.summon("hyprvibe.wifiqr", JSON.stringify(payload))
   }
 
   function refresh(scanWifi) {
     if (scanWifi === undefined) scanWifi = false
-    if (!detailsProc.running) detailsProc.running = true
     if (!dnsProc.running) {
       dnsProc.command = ["bash", "-c", root.dnsCommand("")]
       dnsProc.running = true
@@ -497,81 +456,7 @@ Panel {
     syncWifiNetworks()
   }
 
-  function formatHeaderSpeed(mbps) {
-    return Model.formatHeaderSpeed(mbps)
-  }
 
-  function formatHeaderFreq(mhz) {
-    return Model.formatHeaderFreq(mhz)
-  }
-
-  function headerDetail() {
-    return Model.headerDetail(info)
-  }
-
-  function updateDetails(raw) {
-    var next = Model.parseKeyValue(raw)
-
-    // A band change tears the link down and brings it back, and the status
-    // command reports nothing at all while there is no route. Publishing that
-    // would blank every stat and unmount the whole section mid-toggle, so the
-    // last good sample stands until the reconnect settles. A real disconnect is
-    // still reported, because nothing is in flight then.
-    if (bandBusy && !next.iface) return
-
-    info = next
-    updateThroughput(next)
-    updatePingLatency(next)
-  }
-
-  function updateThroughput(next) {
-    var state = Model.throughputState({
-      prevIface: prevIface,
-      prevRxBytes: prevRxBytes,
-      prevTxBytes: prevTxBytes,
-      prevSampleTime: prevSampleTime,
-      downloadRate: downloadRate,
-      uploadRate: uploadRate
-    }, next, Date.now() / 1000)
-
-    prevIface = state.prevIface
-    prevRxBytes = state.prevRxBytes
-    prevTxBytes = state.prevTxBytes
-    prevSampleTime = state.prevSampleTime
-    downloadRate = state.downloadRate
-    uploadRate = state.uploadRate
-  }
-
-  function updatePingLatency(next) {
-    var state = Model.pingLatencyState({
-      pingIface: pingIface,
-      routerPingSamples: routerPingSamples,
-      internetPingSamples: internetPingSamples
-    }, next, pingHistoryWindow, pingAverageWindow)
-
-    pingIface = state.pingIface
-    routerPingSamples = state.routerPingSamples
-    internetPingSamples = state.internetPingSamples
-    routerPingLatency = state.routerPingLatency
-    internetPingLatency = state.internetPingLatency
-    internetPingPacketLoss = state.internetPingPacketLoss
-  }
-
-  function formatBytes(bytes) {
-    return Model.formatBytes(bytes)
-  }
-
-  function formatRate(bytesPerSec) {
-    return Model.formatRate(bytesPerSec)
-  }
-
-  function formatPingLatency(ms) {
-    return Model.formatPingLatency(ms, hasInternetPing)
-  }
-
-  function formatPacketLoss(percent) {
-    return Model.formatPacketLoss(percent, hasInternetPing)
-  }
 
   // Prefer a connected device: a machine can expose several NICs of the
   // same type (e.g. an idle onboard port alongside the active adapter),
@@ -657,8 +542,8 @@ Panel {
     controller.hide()
     cancelPasswordPrompt()
     var connection = ""
-    if (info.type === "wifi") connection = info.ssid || "Wi-Fi"
-    else if (info.type === "ethernet") connection = "Ethernet"
+    if (kind === "wifi") connection = (connectedWifiNetwork ? connectedWifiNetwork.name : "") || "Wi-Fi"
+    else if (kind === "ethernet") connection = "Ethernet"
     bar.shell.summon("hyprvibe.speedtest", connection ? JSON.stringify({ connection: connection }) : "{}")
   }
 
@@ -810,15 +695,7 @@ Panel {
 
   Component.onCompleted: refresh()
 
-  // Pulls everything we want about the active route's interface in one shot.
-  Process {
-    id: detailsProc
-    command: ["hyprvibe-network-status", "--verbose"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.updateDetails(text)
-    }
-  }
+
 
   // Shells out to network wrapper to force instant Wi-Fi rescan
   Process {
@@ -911,20 +788,12 @@ Panel {
     }
   }
 
-  // Poll details while the panel is open so the IP/route header catches up
-  // as soon as NetworkManager finishes activating a connection.
-  Timer {
-    id: detailsPoll
-    interval: 1500
-    repeat: true
-    running: root.opened
-    onTriggered: if (!detailsProc.running) detailsProc.running = true
-  }
+
 
   Timer {
     id: connectionPhraseTimer
     interval: 2800
-    running: root.opened && (root.info.type === "ethernet" || (root.info.type === "wifi" && root.canDisconnect))
+    running: root.opened && (root.kind === "ethernet" || (root.kind === "wifi" && root.canDisconnect))
     repeat: true
     onTriggered: connectionPhraseSwap.restart()
   }
@@ -946,8 +815,8 @@ Panel {
 
   Connections {
     target: root
-    function onInfoChanged() {
-      if (!(root.info.type === "ethernet" || (root.info.type === "wifi" && root.canDisconnect))) {
+    function onKindChanged() {
+      if (!(root.kind === "ethernet" || (root.kind === "wifi" && root.canDisconnect))) {
         connectionPhraseSwap.stop()
         heroMeta.opacity = 1.0
       }
@@ -1235,13 +1104,12 @@ Panel {
             width: parent.width
 
             readonly property string title: {
-              if (root.info.type === "wifi") return root.info.ssid || "Wi-Fi"
-              if (root.info.type === "ethernet") return "Ethernet"
-              return root.info.iface || (root.kind === "disconnected" ? "Disconnected" : "No connection")
+              if (root.kind === "wifi") return (root.connectedWifiNetwork ? root.connectedWifiNetwork.name : "") || "Wi-Fi"
+              if (root.kind === "ethernet") return "Ethernet"
+              return root.kind === "disconnected" ? "Disconnected" : "No connection"
             }
-            readonly property string detail: root.headerDetail()
 
-            text: heroSsid.detail !== "" ? heroSsid.title + " (" + heroSsid.detail + ")" : heroSsid.title
+            text: heroSsid.title
             color: root.bar.foreground
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.title
@@ -1254,12 +1122,12 @@ Panel {
             textFormat: Text.PlainText
             width: parent.width
             text: {
-              if (root.info.type === "wifi") {
+              if (root.kind === "wifi") {
                 if (root.canDisconnect) return root.connectionPhrase.toUpperCase()
                 if (root.kind === "disconnected") return "NOT CONNECTED"
                 return ""
               }
-              if (root.info.type === "ethernet") return root.connectionPhrase.toUpperCase()
+              if (root.kind === "ethernet") return root.connectionPhrase.toUpperCase()
               if (root.kind === "disconnected") return "NOT CONNECTED"
               return ""
             }
@@ -1275,57 +1143,7 @@ Panel {
 
       }
 
-      // Connection details: transfer metrics first, then IP/Gateway.
-      Column {
-        visible: !!root.info.iface
-        width: parent.width
-        spacing: Style.spacing.labelGap
 
-        GridLayout {
-          width: parent.width
-          columns: 4
-          columnSpacing: Style.space(20)
-          rowSpacing: Style.spacing.labelGap
-
-          // Always mounted: these two used to appear a beat after the panel
-          // opened, once the first probe returned, shoving everything below
-          // them down. They now hold their place and read "--" until there is
-          // a sample.
-          InfoLabel { text: "Ping" }
-          DetailValue {
-            text: root.formatPingLatency(root.internetPingLatency)
-            color: root.internetPingPacketLoss > 0 ? root.bar.urgent : root.bar.foreground
-          }
-          InfoLabel { text: "Packet Loss" }
-          DetailValue {
-            text: root.formatPacketLoss(root.internetPingPacketLoss)
-            color: root.internetPingPacketLoss > 0 ? root.bar.urgent : root.bar.foreground
-          }
-
-          InfoLabel { text: "Receiving" }
-          DetailValue { text: root.hasTransferStats ? root.formatRate(root.downloadRate) : "--" }
-          InfoLabel { text: "Sending" }
-          DetailValue { text: root.hasTransferStats ? root.formatRate(root.uploadRate) : "--" }
-
-          InfoLabel { text: "Downloaded" }
-          DetailValue { text: root.hasTransferStats ? root.formatBytes(parseFloat(root.info.rx_bytes || "0")) : "--" }
-          InfoLabel { text: "Uploaded" }
-          DetailValue { text: root.hasTransferStats ? root.formatBytes(parseFloat(root.info.tx_bytes || "0")) : "--" }
-
-          InfoLabel { text: "IP Address" }
-          DetailValue {
-            text: root.info.ip || "--"
-            copyable: !!root.info.ip
-            tooltipText: "Copy IP"
-          }
-          InfoLabel { text: "Gateway" }
-          DetailValue {
-            text: root.info.gateway || "--"
-            copyable: !!root.info.gateway
-            tooltipText: "Copy gateway"
-          }
-        }
-      }
 
       // Wi-Fi band selection. Only on Wi-Fi, and only when the network answers
       // on more than one band -- a single-band AP has nothing to toggle.
@@ -1990,41 +1808,5 @@ Panel {
   }
 
 
-  component DetailValue: InfoValue {
-    property bool copyable: false
-    property string tooltipText: "Copy to clipboard"
 
-    Layout.fillWidth: true
-    horizontalAlignment: Text.AlignRight
-
-    MouseArea {
-      id: valueMouse
-      anchors.fill: parent
-      enabled: copyable && parent.text !== ""
-      hoverEnabled: enabled
-      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-      onClicked: root.copyToClipboard(parent.text)
-    }
-
-    PanelToolTip {
-      visible: valueMouse.enabled && valueMouse.containsMouse
-      text: tooltipText
-      fontFamily: root.bar.fontFamily
-    }
-  }
-
-  component InfoLabel: Text {
-    textFormat: Text.PlainText
-    color: root.bar.foreground
-    opacity: 0.6
-    font.family: root.bar.fontFamily
-    font.pixelSize: Style.font.bodySmall
-  }
-
-  component InfoValue: Text {
-    textFormat: Text.PlainText
-    color: root.bar.foreground
-    font.family: root.bar.fontFamily
-    font.pixelSize: Style.font.bodySmall
-  }
 }

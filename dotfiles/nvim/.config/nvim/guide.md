@@ -256,9 +256,8 @@ vim.g.snacks_projects_dev = { "~/dev", "~/projects", "~/work" }
 | :--- | :--- |
 | **Black Metal (Monochrome)** | `<leader>1` |
 | **Gruvbox** | `<leader>2` |
-| **Tokyo Night** | `<leader>3` |
-| **Catppuccin Mocha** | `<leader>4` |
-| **Everforest** | `<leader>5` |
+| **Catppuccin Mocha** | `<leader>3` |
+| **Everforest** | `<leader>4` |
 
 ---
 
