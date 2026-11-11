@@ -25,6 +25,7 @@ PACKAGES=(
     gtk-3.0
     gtk-4.0
     hypr
+    llama-server
     madsnake
     mpd
     mpv
@@ -33,6 +34,7 @@ PACKAGES=(
     quickshell
     rmpc
     rofi
+    sd-server
     shell-config
     tmux
     xfce4

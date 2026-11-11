@@ -315,6 +315,7 @@ lua51-lpeg
 luajit
 lvm2
 mailcap
+mako
 man-db
 man-pages
 mariadb-libs
@@ -494,7 +495,6 @@ slurp
 smartmontools
 socat
 sof-firmware
-sound-theme-freedesktop
 solid
 sonnet
 source-highlight
